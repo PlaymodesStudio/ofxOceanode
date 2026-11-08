@@ -721,6 +721,9 @@ dialog, which still appears when Start! activates that source.
 
 The **Status** text output is one short, coloured word. During a morph it
 describes that morph; otherwise, in Morph mode, the next morph into Target.
+On the node and in the Inspector its colour is raised to the warmest Details
+of the running, destination, queued and selected sources, so a finished
+transition that replaced a node keeps the word orange while that source runs.
 
 | Status | Colour | Meaning |
 |---|---|---|

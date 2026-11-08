@@ -540,7 +540,7 @@ bool ofxOceanodeMacroMixer::moveImportedMacro(const std::string& id, size_t inde
 
 bool ofxOceanodeMacroMixer::drawInspectorParameter(ofAbstractParameter& parameter) {
     if(!parameter.isReferenceTo(state)) return false;
-    ImGui::TextColored(healthColor(health()), "%s", shortStatus().c_str());
+    ImGui::TextColored(healthColor(displayHealth()), "%s", shortStatus().c_str());
     ImGui::TextWrapped("%s", state.get().c_str());
     return true;
 }
@@ -555,7 +555,7 @@ bool ofxOceanodeMacroMixer::drawNodeParameter(ofxOceanodeAbstractParameter& para
     ImGui::Dummy(ImVec2(widgetWidth, ImGui::GetFrameHeight()));
     const auto& padding = ImGui::GetStyle().FramePadding;
     ImGui::GetWindowDrawList()->AddText(ImVec2(origin.x + padding.x, origin.y + padding.y),
-        ImGui::ColorConvertFloat4ToU32(healthColor(health())), summary.get().c_str());
+        ImGui::ColorConvertFloat4ToU32(healthColor(displayHealth())), summary.get().c_str());
     ImGui::EndGroup();
     return true;
 }
@@ -1120,6 +1120,15 @@ ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::detailsHealth(const std::st
         if(detail.kind == "fallback" || detail.kind == "skipped") return Health::GraphFallback;
         if(detail.kind == "replaced") result = Health::NodeFallback;
     }
+    return result;
+}
+ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::displayHealth() const {
+    auto result = health();
+    if(!runtime || result == Health::Neutral) return result;
+    // Reads only the badged sources' Details; health() already computed the
+    // next target's, and the others are recorded or cheap while a fade runs.
+    for(const auto& id : {runtime->currentID(), runtime->destinationID(), runtime->queuedID(), selectedID})
+        result = std::max(result, detailsHealth(id));
     return result;
 }
 std::string ofxOceanodeMacroMixer::shortStatus() const {

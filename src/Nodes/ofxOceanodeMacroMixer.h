@@ -76,6 +76,9 @@ private:
     Health health() const;
     // The warmest of one source's Details: Ok, or a node/graph fallback.
     Health detailsHealth(const std::string& id) const;
+    // health() raised to the warmest Details of the running, destination,
+    // queued and selected sources, for the Status colour.
+    Health displayHealth() const;
     std::string shortStatus() const;
     std::string routerEditBlocker(const std::string& id) const;
     ofParameter<std::string> state, summary;
