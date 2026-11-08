@@ -330,6 +330,17 @@ alone, and published controls are blended with the rest of the sound. Voices
 and Channels are Structural, so a change there replaces the polycombBox. Show is
 skipped.
 
+SC Mixer Pro blends its `mixerPro` block on the running node: every strip's
+level, balance, mute and solo, EQ, the HP, compressor, saturation, echo,
+reverb and width inserts, sends, sidechain and the master section. Numbers
+glide (frequencies and times in log), switches, modes and routing jump half
+way, and published strip controls are blended with the mix rather than by
+the control morph. Track, bus, return and channel counts, each strip's
+server and Follow Graph Server are Structural, so a change there replaces
+the mixer. Names and colours are not sound and are left alone. This is what
+lets two audio presets that share their engines morph in place without
+running two mixers.
+
 When the running graph cannot be reused, the morph falls back to a crossfade.
 A fresh destination Macro is loaded next to the running one and both keep
 running. The destination's matching controls start at the captured current
