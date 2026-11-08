@@ -805,7 +805,12 @@ bool ofxOceanodeMacroMixer::drawSourceHeader(const MacroMixerRevision& macro, si
         }
         ImGui::EndTooltip();
     }
-    if(!badges.empty()) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", badges.c_str()); }
+    if(!badges.empty()) {
+        // Badges take the warmest colour of this source's Details, green when none is orange or red.
+        const auto badgeHealth = detailsHealth(macro.id());
+        ImGui::SameLine();
+        ImGui::TextColored(badgeHealth == Health::Ok ? ImVec4(0, 1, 0, 1) : healthColor(badgeHealth), "%s", badges.c_str());
+    }
     // Refresh, up, down and remove, right-aligned on the header row.
     const float gap = em * .25f, square = ImGui::GetFrameHeight();
     const float buttons = 3 * square + ImGui::CalcTextSize("-").x + style.FramePadding.x * 2 + 3 * gap;
@@ -1103,8 +1108,15 @@ ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::health() const {
         into = runtime->destinationID();
     } else if(mode == 1 && runtime->origin() && selectedID != runtime->currentID()) into = selectedID;
     if(into.empty()) return Health::Ok;
+    return detailsHealth(into);
+}
+ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::detailsHealth(const std::string& id) const {
+    // Details only exist in Morph mode. The running source is read only once a
+    // transition recorded its Details: a preview from itself says nothing.
+    if(!runtime || id.empty() || !(mode == 1 || runtime->morphMode())) return Health::Ok;
+    if(id == runtime->currentID() && !runtime->hasTransitionDetails(id)) return Health::Ok;
     auto result = Health::Ok;
-    for(const auto& detail : runtime->sourceDetails(into)) {
+    for(const auto& detail : runtime->sourceDetails(id)) {
         if(detail.kind == "fallback" || detail.kind == "skipped") return Health::GraphFallback;
         if(detail.kind == "replaced") result = Health::NodeFallback;
     }

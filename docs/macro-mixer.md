@@ -130,7 +130,8 @@ Rendering runs only during draw. Internal processing follows native frame order;
 a downstream draw-driven node can observe the mixed image on the following frame.
 
 Each source has a collapsible header in the node color (stronger while it
-runs) with its index, name and badges in green, and refresh (circular arrow),
+runs) with its index, name and badges (Running, Destination, Queued, Selected)
+in the warmest colour of its Details, green when none is orange or red, and refresh (circular arrow),
 move up/down and **-** (remove) on the right. Choose the source with Target. Expanded, every source has the same layout.
 Paths start at the data folder; hover for the full path.
 

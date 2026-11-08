@@ -74,6 +74,8 @@ private:
     bool syncInputs();
     void reportFailure();
     Health health() const;
+    // The warmest of one source's Details: Ok, or a node/graph fallback.
+    Health detailsHealth(const std::string& id) const;
     std::string shortStatus() const;
     std::string routerEditBlocker(const std::string& id) const;
     ofParameter<std::string> state, summary;
