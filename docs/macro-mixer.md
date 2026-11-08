@@ -282,7 +282,8 @@ the same; when they change, the graph falls back (`changes drivers with
 several cabled Portals`), as it does when the target's Portals on one bus were
 saved with different values. Global buses keep the rules below.
 
-A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
+A Macro's **Color** and the order of its pins (**RouterSortOrder**) are
+cosmetic: a different saved colour or pin order in a nested Macro is
 not a configuration change and never makes a morph replace the Macro or fall
 back. The running Macro keeps its colour. A library Macro takes its title
 from the library, so its saved **Local Name** is ignored the same way; a local
@@ -662,22 +663,29 @@ What stays on one server:
 - A mixer with an ScBus **Input** router: its outer source would run on both
   servers.
 - A source holding an ScBus Portal (it shares audio with the rest of the
-  patch), or an SC Mixer Pro (its tracks name their servers, and each `Out
-  Sn` carries one server's mix) unless that Mixer Pro has **Follow Graph
-  Server** on (Inspector) with every strip on one server. With it on, its
+  patch), or an SC Mixer Pro whose strips name several servers (each `Out
+  Sn` carries one server's mix).
+- A source is **pinned** to a server when its nodes can play only there: SC
+  nodes saved with a **Server** (SC FFT HD, Buffer Allocator, A2k and the
+  other analysis nodes), and an SC Mixer Pro without **Follow Graph Server**
+  (Inspector) whose strips all name one server, since such a Mixer Pro
+  builds no strips on any other server and its output stays silent there.
+  The incoming side goes to the pinned server when an SC Output there plays
+  the mixer, even with Audio Servers on Single (the running graph may sit on
+  another server after an earlier Alternate transition); nodes naming two
+  servers keep the source single. The reason shows in Details.
+- With Follow Graph Server on and every strip on one server, a Mixer Pro's
   strips play on whichever server builds the graph, writing the output of
   their own server index (`Out S1` for strips on S1), so the source moves
   like any other; keep the cable on that output. BLOOBS 2_CELLS_AUDIO
   (`Macro_12`) and 2_GHOSTS_BIONIC_AUDIO (`Macro_7`) need it switched on
-  and saved to alternate.
-- A source whose SC nodes are saved with a **Server** (SC FFT HD, Buffer
-  Allocator, A2k and the other analysis nodes) is placed on that server, if
-  an SC Output there plays the mixer; nodes naming two servers keep it
-  single. The reason shows in Details.
+  and saved to alternate; with it on in only one of them, every transition
+  between the two lands on server 0.
 - Trigger and Texture policies are unaffected; a MacroMixer inside a source
   is reached only on its graph's server, so it stays where its graph is.
 - With Single, a graph that was never placed runs exactly as before; a
-  graph placed while Alternate was on stays on its server.
+  graph placed while Alternate was on stays on its server unless the
+  target is pinned elsewhere.
 
 **SynthDefs.** A free server may never have loaded what the destination
 needs, and its first rebuild would wait for `/d_loadDir` and `/sync` with the

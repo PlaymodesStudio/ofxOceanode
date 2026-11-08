@@ -1006,8 +1006,11 @@ MacroMixerMixing::PlacementPin MacroMixerRuntime::placementPin(const Revision& r
 }
 void MacroMixerRuntime::preparePlacement(MacroMixerMixing::Placement& placement,const Revision& origin,const Revision& target,bool inPlace) const {
     placement.spread=false; placement.pin=-1; placement.reason.clear(); placement.note.clear(); placement.incoming=nullptr;
-    if(!alternateServers) { placement.reason="Audio Servers is Single"; return; }
     const auto to=placementPin(target);
+    // A pin is where the target's nodes can play at all, so it is honoured
+    // with Audio Servers on Single too: the running graph may sit on another
+    // server after an earlier Alternate transition.
+    if(!alternateServers && to.index<0) { placement.reason="Audio Servers is Single"; return; }
     if(to.single) { placement.reason=to.reason; return; }
     // In place, the origin's shared resources run on through the morph.
     if(inPlace) { const auto from=placementPin(origin); if(from.single) { placement.reason=from.reason; return; } }

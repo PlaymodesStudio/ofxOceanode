@@ -718,6 +718,16 @@ int main(int argc,char** argv) {
         assert(replaced==(kind==1));
         assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
     }
+    // The order of a Macro's pins is cosmetic: a different saved
+    // RouterSortOrder keeps the running Macro (local and library alike).
+    for(int kind=1;kind<=2;++kind) {
+        const auto sorted=scratch+"/nested-sorted-"+std::to_string(kind); fs::copy(nestedTargets[kind-1],sorted,fs::copy_options::recursive);
+        auto json=ofLoadJson(sorted+"/Macro_2.json"); json["RouterSortOrder"]=ofJson::array({"Zeta","Alpha"}); ofSaveJson(sorted+"/Macro_2.json",json);
+        MacroMixerRuntime r(parent); assert(r.importMacro(nestedTargets[kind-1])&&r.importMacro(sorted));
+        r.request(nestedTargets[kind-1],0,0,true); r.update(0);
+        const auto details=r.sourceDetails(r.importedMacro(sorted)->id());
+        assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="replaced"||d.kind=="fallback";}));
+    }
     // Rollback cleans a fully loaded nested graph and all boundary cables.
     {
         std::vector<MacroMixerDiagnostic> errors;

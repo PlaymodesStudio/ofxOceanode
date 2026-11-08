@@ -236,11 +236,15 @@ int main(int argc,char** argv) {
             return ofJson::parse(R"({"nodes":{"M":{"model":"Macro","settings":{},"graph":{"nodes":{"SC_Mixer_Pro_1":{"model":"SC Mixer Pro","settings":{)"
                 +follow+R"("mixerPro":{"tracks":[{"server":)"+std::to_string(a)+R"(},{"server":)"+std::to_string(b)+R"(}],"buses":[],"returns":[]}}}}}}}})");
         };
-        pin=hooks->pin(mixerPro("",0,0));assert(pin.single&&pin.reason.find("Follow Graph Server")!=std::string::npos);
-        pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"0",)",0,0));assert(pin.single);
+        // Not following, its strips play only on the server they name: the
+        // source is pinned there (a following one goes anywhere; strips on
+        // several servers keep it single).
+        pin=hooks->pin(mixerPro("",1,1));assert(!pin.single&&pin.index==1&&pin.reason.find("Follow Graph Server")!=std::string::npos);
+        pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"0",)",0,0));assert(!pin.single&&pin.index==0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",0,0));assert(!pin.single&&pin.index<0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",1,1));assert(!pin.single&&pin.index<0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",0,1));assert(pin.single);
+        pin=hooks->pin(mixerPro("",0,1));assert(pin.single);
         assert(hooks->carries("SC Mixer Test Tone")&&hooks->carries("Router ScBus")&&!hooks->carries("Router Float"));
         assert(hooks->name(&s1)=="0"&&hooks->name(&s2)=="1"&&hooks->name(&s3).empty());
     }
