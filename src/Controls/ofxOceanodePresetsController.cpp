@@ -7,6 +7,7 @@
 
 #include "ofxOceanodePresetsController.h"
 #include "ofxOceanodeContainer.h"
+#include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeNode.h"
@@ -20,6 +21,8 @@
 #include "ofxOceanodeMenu.h"
 
 namespace {
+ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& baseline = ofJson());
+
 const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
 const ImVec4 presetItemTextColor(150.0f / 255.0f, 150.0f / 255.0f, 150.0f / 255.0f, 1.0f);
 
@@ -259,7 +262,6 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         string presetName = presetInfo.second;
         auto bankPos = std::find(banks.begin(), banks.end(), bankName);
         if(bankPos != banks.end()){
-            currentBank = bankPos - banks.begin();
             const auto& presets = bankPresets[bankName];
             auto presetIt = std::find(presets.begin(), presets.end(), presetName);
             if(presetIt != presets.end()){
@@ -274,7 +276,6 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
         
         auto bankPos = std::find(banks.begin(), banks.end(), bankName);
         if(bankPos != banks.end()){
-            currentBank = bankPos - banks.begin();
             if(presetNum >= 1 && static_cast<int>(bankPresets[bankName].size()) >= presetNum){
                 loadPreset(presetNum - 1, bankName);
             }
@@ -292,6 +293,12 @@ ofxOceanodePresetsController::ofxOceanodePresetsController(shared_ptr<ofxOceanod
     newPresetCreated = false;
 
     loadPresetInNextUpdate = 0;
+    rememberSavedState();
+    presetLoadedListener = ofxOceanodeShared::getPresetHasLoadedEvent().newListener([this](){
+        if(ofxOceanodeShared::getPresetLoadType() == ofxOceanodePresetLoadType_FullPreset)
+            rememberSavedState();
+    });
+    presetSavedListener = ofxOceanodeShared::getPresetWasSavedEvent().newListener([this](){ rememberSavedState(); });
 }
 
 void ofxOceanodePresetsController::draw(){
@@ -335,16 +342,42 @@ void ofxOceanodePresetsController::drawPopups(){
     }else if(popupRequest == PopupRequest::SaveAs){
         // Start from the last preset name so a new version only needs a suffix.
         std::snprintf(presetNameBuffer, sizeof(presetNameBuffer), "%s", lastPresetName.c_str());
-        saveAsBank = currentBank;
+        saveAsBank = currentBank >= 0 ? currentBank : (banks.empty() ? -1 : 0);
+        saveAsReplacementIndex = -1;
         ImGui::OpenPopup("Save Preset As");
     }else if(popupRequest == PopupRequest::Delete){
         ImGui::OpenPopup("Delete Preset?");
     }else if(popupRequest == PopupRequest::ReviewSave){
         ImGui::OpenPopup("Review Global Macros");
+    }else if(popupRequest == PopupRequest::UnsavedChanges){
+        ImGui::OpenPopup("Save changes?");
     }else if(popupRequest == PopupRequest::SaveResult){
         ImGui::OpenPopup("Preset Save Result");
     }
     popupRequest = PopupRequest::None;
+
+    if(ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+        const string name = ofxOceanodeShared::getCurrentPresetName();
+        ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
+        if(!name.empty()) ImGui::Text("Preset: %s", name.c_str());
+        ImGui::TextUnformatted("Save your changes before continuing?");
+        if(ImGui::Button("Save changes...")){
+            savingBeforeAction = true;
+            popupRequest = PopupRequest::SaveAs;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Don't Save")){
+            actionApproved = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)){
+            cancelPendingAction();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     if(ImGui::BeginPopupModal("Add New Bank", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
@@ -389,19 +422,74 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::PopItemWidth();
         const string requestedName = sanitizePresetName(presetNameBuffer);
         const bool hasBank = saveAsBank >= 0 && saveAsBank < static_cast<int>(banks.size());
-        const bool duplicate = hasBank && presetNameExists(bankPresets[banks[saveAsBank]], requestedName);
-        const bool canSave = hasBank && !requestedName.empty() && !duplicate;
+        const auto targets = hasBank ? saveAsReplacementTargets(banks[saveAsBank], string(presetNameBuffer)) : vector<int>{};
+        const bool replacing = !targets.empty();
+        const bool canSave = hasBank && !requestedName.empty();
         if(!hasBank) ImGui::TextDisabled("Select a bank to save the preset.");
-        if(duplicate) ImGui::TextDisabled("A preset with this name already exists in this bank.");
+        if(replacing){
+            if(std::find(targets.begin(), targets.end(), saveAsReplacementIndex) == targets.end()){
+                saveAsReplacementIndex = targets.front();
+                // Legacy banks can contain duplicate names: prefer the loaded
+                // preset's number, and let the user choose explicitly below.
+                const auto current = currentPreset.find(banks[saveAsBank]);
+                if(current != currentPreset.end() &&
+                   ofxOceanodeShared::getCurrentBankName() == banks[saveAsBank] &&
+                   std::find(targets.begin(), targets.end(), current->second) != targets.end())
+                    saveAsReplacementIndex = current->second;
+            }
+            ImGui::TextWrapped("A preset with this name already exists. Saving will replace it after confirmation.");
+            auto labelFor = [&](int index){ return ofToString(index + 1) + " | " + presetNameAt(index, banks[saveAsBank]); };
+            if(targets.size() > 1 && ImGui::BeginCombo("Replace preset", labelFor(saveAsReplacementIndex).c_str())){
+                for(int index : targets){
+                    if(ImGui::Selectable(labelFor(index).c_str(), index == saveAsReplacementIndex))
+                        saveAsReplacementIndex = index;
+                }
+                ImGui::EndCombo();
+            }
+        }else saveAsReplacementIndex = -1;
         ImGui::BeginDisabled(!canSave);
-        const bool save = ImGui::Button("Save");
+        const bool save = ImGui::Button(replacing ? "Replace..." : "Save");
         ImGui::EndDisabled();
+        bool closeSaveAs = false;
         if(canSave && (enter || save)){
-            beginSavePreset(requestedName, banks[saveAsBank], -1);
-            ImGui::CloseCurrentPopup();
+            if(replacing){
+                replacementBank = banks[saveAsBank];
+                replacementIndex = saveAsReplacementIndex;
+                replacementName = presetNameAt(replacementIndex, replacementBank);
+                ImGui::OpenPopup("Replace Preset?");
+            }else{
+                beginSavePreset(requestedName, banks[saveAsBank], -1);
+                closeSaveAs = true;
+            }
         }
         ImGui::SameLine();
-        if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+        if(ImGui::Button("Cancel") || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("Replace Preset?"))){
+            cancelPendingAction();
+            closeSaveAs = true;
+        }
+        if(ImGui::BeginPopupModal("Replace Preset?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+            ImGui::Text("Bank: %s", replacementBank.c_str());
+            ImGui::Text("Preset: %d | %s", replacementIndex + 1, replacementName.c_str());
+            ImGui::TextUnformatted("Replace this preset with your current changes?");
+            ImGui::TextUnformatted("The existing preset will be overwritten. Global macros are reviewed next.");
+            const bool targetUnchanged = !replacementName.empty() &&
+                presetNameAt(replacementIndex, replacementBank) == replacementName;
+            if(!targetUnchanged) ImGui::TextWrapped("The preset list changed. Cancel and select the destination again.");
+            ImGui::BeginDisabled(!targetUnchanged);
+            const bool replace = ImGui::Button("Replace");
+            ImGui::EndDisabled();
+            if(replace && targetUnchanged){
+                // The normal Save pipeline owns macro review, write failures,
+                // saved-state tracking and the pending destructive action.
+                beginSavePreset("", replacementBank, replacementIndex);
+                ImGui::CloseCurrentPopup();
+                closeSaveAs = true;
+            }
+            ImGui::SameLine();
+            if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+        if(closeSaveAs) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
@@ -488,7 +576,66 @@ void ofxOceanodePresetsController::drawPresetList(){
     ImGui::PopStyleColor();
 }
 
+void ofxOceanodePresetsController::rememberSavedState(){
+    savedEditState = capturePresetEditState(*container);
+}
+
+bool ofxOceanodePresetsController::hasUnsavedChanges(){
+    return capturePresetEditState(*container, savedEditState) != savedEditState ||
+           !collectGlobalMacroSaveReviews(*container).empty();
+}
+
+void ofxOceanodePresetsController::cancelPendingAction(){
+    pendingAction = {};
+    savingBeforeAction = false;
+    actionApproved = false;
+}
+
+void ofxOceanodePresetsController::requestDestructiveAction(std::function<void()> action){
+    // Keep the first destination while the user decides or reviews macros.
+    if(pendingAction || pendingSave) return;
+    pendingAction = std::move(action);
+    actionApproved = !hasUnsavedChanges();
+    if(!actionApproved) popupRequest = PopupRequest::UnsavedChanges;
+}
+
+void ofxOceanodePresetsController::requestLoadPreset(const string& path){
+    if(!ofDirectory::doesDirectoryExist(path)) return;
+    requestDestructiveAction([this, path](){
+        ofxOceanodeShared::startedLoadingPreset();
+        const auto oldPath = ofxOceanodeShared::getCurrentPresetPath();
+        const auto oldBank = ofxOceanodeShared::getCurrentBankName();
+        const auto oldName = ofxOceanodeShared::getCurrentPresetName();
+        const auto oldState = savedEditState;
+        const string name = ofFilePath::getFileName(ofFilePath::removeTrailingSlash(path));
+        ofxOceanodeShared::setCurrentPresetPath(path);
+        ofxOceanodeShared::setCurrentBankName("");
+        ofxOceanodeShared::setCurrentPresetName(name);
+        const bool loaded = container->loadPreset(path);
+        if(!loaded){
+            ofxOceanodeShared::setCurrentPresetPath(oldPath);
+            ofxOceanodeShared::setCurrentBankName(oldBank);
+            ofxOceanodeShared::setCurrentPresetName(oldName);
+        }else{
+            currentBank = -1;
+            for(auto& preset : currentPreset) preset.second = -1;
+            lastPresetName = name;
+        }
+        ofxOceanodeShared::finishedLoadingPreset();
+        if(!loaded) savedEditState = oldState;
+    });
+}
+
 void ofxOceanodePresetsController::update(){
+    if(actionApproved && pendingAction){
+        auto action = std::move(pendingAction);
+        pendingAction = {};
+        actionApproved = false;
+        bypassSaveGuard = true;
+        action();
+        bypassSaveGuard = false;
+        return;
+    }
     if(newPresetRequested){
         newPresetRequested = false;
         newPreset();
@@ -507,6 +654,10 @@ void ofxOceanodePresetsController::update(){
 }
 
 void ofxOceanodePresetsController::newPreset(){
+    if(!bypassSaveGuard && (pendingAction || hasUnsavedChanges())){
+        requestDestructiveAction([this](){ newPreset(); });
+        return;
+    }
     loadPresetInNextUpdate = 0;
     pendingSave.reset();
     popupRequest = PopupRequest::None;
@@ -552,6 +703,11 @@ void ofxOceanodePresetsController::loadPreset(int index, const string& bank){
         return;
     }
 
+    if(!bypassSaveGuard && (pendingAction || hasUnsavedChanges())){
+        requestDestructiveAction([this, index, bank](){ loadPreset(index, bank); });
+        return;
+    }
+
     auto bankPos = std::find(banks.begin(), banks.end(), bank);
     if(bankPos != banks.end()) currentBank = static_cast<int>(std::distance(banks.begin(), bankPos));
     currentPreset[bank] = index;
@@ -576,6 +732,19 @@ void ofxOceanodePresetsController::savePreset(int index, const string& bank)
         return;
     }
     beginSavePreset("", bank, index);
+}
+
+vector<int> ofxOceanodePresetsController::saveAsReplacementTargets(const string& bank, const string& name) const{
+    vector<int> targets;
+    const auto found = bankPresets.find(bank);
+    if(found == bankPresets.end() || name.empty()) return targets;
+    const auto sanitized = sanitizePresetName(name);
+    for(int index = 0; index < static_cast<int>(found->second.size()); ++index){
+        // Preserve existing names containing spaces while still recognizing
+        // the underscore spelling used when creating a new preset.
+        if(found->second[index] == name || found->second[index] == sanitized) targets.push_back(index);
+    }
+    return targets;
 }
 
 void ofxOceanodePresetsController::beginSavePreset(string name, string bank, int index){
@@ -670,6 +839,8 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     if(conflictingInstances) ImGui::TextWrapped("Other instances of this macro have different edits. Choose only one instance to save as the global macro.");
     if(samePathAlreadySelected) ImGui::TextWrapped("Another instance has already been chosen to save this global macro.");
 
+    if(savingBeforeAction)
+        ImGui::TextWrapped("Skipping a macro discards its unsaved edits when you continue.");
     ImGui::Separator();
     drawGlobalMacroSaveChanges(review, reviewWidth);
 
@@ -689,6 +860,7 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
             for(const auto& name : request.savedAsMacros) saveResultText += "\nSaved as new before failure: " + name;
             for(const auto& name : request.savedMacros) saveResultText += "\nSaved before failure: " + name;
             pendingSave.reset();
+            cancelPendingAction();
             ImGui::CloseCurrentPopup();
             popupRequest = PopupRequest::SaveResult;
         }
@@ -730,6 +902,7 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
                 popupRequest = PopupRequest::SaveResult;
             }
             pendingSave.reset();
+            cancelPendingAction();
             ImGui::CloseCurrentPopup();
             ImGui::EndPopup();
             return;
@@ -919,6 +1092,7 @@ void ofxOceanodePresetsController::finishSavePreset(){
         for(const auto& macro : request.savedAsMacros) saveResultText += "\nGlobal macro already saved as new: " + macro;
         for(const auto& macro : request.savedMacros) saveResultText += "\nGlobal macro already saved: " + macro;
         pendingSave.reset();
+        cancelPendingAction();
         popupRequest = PopupRequest::SaveResult;
         return;
     }
@@ -944,6 +1118,11 @@ void ofxOceanodePresetsController::finishSavePreset(){
         popupRequest = PopupRequest::SaveResult;
     }
     pendingSave.reset();
+    if(savingBeforeAction){
+        savingBeforeAction = false;
+        actionApproved = true;
+        popupRequest = PopupRequest::None;
+    }
 }
 void ofxOceanodePresetsController::deletePreset(int index, const string& bankName)
 {
@@ -1172,6 +1351,80 @@ ofJson normalizedCustomGuiSnapshots(ofJson json){
         if(bank.is_object()) bank.erase("currentSnapshotId");
     }
     return banks;
+}
+
+// Capture a baseline after loading/saving. Live clocks and unedited parameter
+// values reuse that baseline; authored content is compared only on a request.
+ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& baseline){
+    ofJson state = {{"nodes", ofJson::object()}, {"connections", currentConnections(container)},
+                    {"comments", currentComments(container)},
+                    {"customGui", normalizedCustomGuis(container.getCustomGuisJsonForReview())},
+                    {"customGuiSnapshots", normalizedCustomGuiSnapshots(container.getCustomGuiSnapshotsJsonForReview())},
+                    {"midi", container.getMidiBindingsJsonForReview()}};
+    for(size_t i = 0; i < container.getComments().size(); ++i){
+        state["comments"]["Comments"][i]["Color"]["A"] = container.getComments()[i].color.a;
+        state["comments"]["Comments"][i]["TextColor"]["A"] = container.getComments()[i].textColor.a;
+    }
+    if(container.isTransportOwner()){
+        auto* automation = container.getAutomationExtension();
+        if(automation) state["automation"] = automation->presetEditState();
+        if(auto transport = container.getTransport()){
+            // The transport's current beat and playing flag are runtime state.
+            // Authored BPM is saved, while automated/external BPM is not an edit.
+            const bool drivenTempo = transport->hasExternalClock() || (automation && automation->isBpmAutomationEnabled());
+            state["bpm"] = drivenTempo && baseline.contains("bpm") ? baseline["bpm"] : ofJson(transport->getState().bpm);
+        }
+#ifdef OFXOCEANODE_USE_MIDI
+        state["midiClockSync"] = container.isMidiClockSyncEnabled();
+#endif
+    }
+    // An absent optional addon and its initial empty document are equivalent.
+    if(!state.contains("automation")) state["automation"] = nullptr;
+    for(auto* node : container.getAllModules()){
+        const auto key = nodeKey(*node);
+        const auto old = field(field(baseline, "nodes"), key);
+        auto& model = node->getNodeModel();
+        ofJson parameters = node->saveParametersToJson(false);
+        ofJson inspector;
+        node->saveInspectorParametersToJson(inspector);
+        ofJson modelData;
+        model.presetSave(modelData);
+        if(modelData.is_object()){
+            for(auto it = modelData.begin(); it != modelData.end();){
+                if(parameters.contains(it.key()) || inspector.contains(it.key()) ||
+                   !model.shouldReviewPresetSaveField(it.key(), it.value()) ||
+                   it.key() == "AllCurvesOutput" || it.key() == "ExtWindowRect" ||
+                   it.key() == "ExtWindowMode" || it.key() == "SelectedSnapshotSlot") it = modelData.erase(it);
+                else ++it;
+            }
+        }
+        auto maskRuntimeValues = [&](ofJson& values, const char* kind, bool isInspector){
+            const auto previous = field(old, kind);
+            if(!values.is_object() || !previous.is_object()) return;
+            for(auto it = values.begin(); it != values.end(); ++it){
+                if(!container.wasValueUserEdited(*node, it.key(), it.value(), isInspector) && previous.contains(it.key()))
+                    it.value() = previous[it.key()];
+            }
+        };
+        maskRuntimeValues(parameters, "parameters", false);
+        maskRuntimeValues(inspector, "inspector", true);
+        ofJson entry = {{"position", nodePosition(*node)}, {"persistent", node->getIsPersistent()},
+                        {"parameters", parameters}, {"inspector", inspector}, {"model", modelData}};
+        node->saveNodeSettings(entry["settings"]);
+        // Recalling a node snapshot is playback; editing its stored slots is work.
+        if(entry["settings"].contains("__NodeSnapshots"))
+            entry["settings"]["__NodeSnapshots"].erase("Current");
+        if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&model)){
+            entry["macro"] = {{"local", macro->isLocal()}, {"name", macro->isLocal() ? macro->getLocalMacroName() : macro->getCurrentMacroName()},
+                              {"category", macro->getCurrentMacroCategory()}};
+            if(macro->isLocal()){
+                entry["macro"]["order"] = macro->getRouterSortOrder();
+                entry["macro"]["contents"] = capturePresetEditState(*macro->getContainer(), field(field(old, "macro"), "contents"));
+            }
+        }
+        state["nodes"][key] = std::move(entry);
+    }
+    return state;
 }
 
 void compareContainer(ofxOceanodeContainer& container, const std::string& savedFolder,

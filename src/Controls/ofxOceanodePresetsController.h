@@ -24,6 +24,11 @@ public:
     bool isMenuController() const override { return true; }
     
     void loadPresetFromNumber(int num);
+    // Interactive root loads and host quit actions share the same save guard.
+    void requestLoadPreset(const string& path);
+    void requestDestructiveAction(std::function<void()> action);
+    bool hasUnsavedChanges();
+    void rememberSavedState();
     
 private:
     void newPreset();
@@ -38,6 +43,7 @@ private:
     // preset at index is overwritten and name is ignored.
     void beginSavePreset(string name, string bank, int index);
     void finishSavePreset();
+    vector<int> saveAsReplacementTargets(const string& bank, const string& name) const;
     void drawGlobalMacroSaveReview();
     void deletePreset(int index, const string& bank);
     // Absolute folder of a listed preset: Presets/<bank>/<index>--<name>.
@@ -52,7 +58,7 @@ private:
     vector<string> banks;
     int currentBank = -1;
 
-    enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult };
+    enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult, UnsavedChanges };
     PopupRequest popupRequest = PopupRequest::None;
     char bankNameBuffer[256] = {};
     char presetNameBuffer[256] = {};
@@ -60,6 +66,9 @@ private:
     // Save As starts from this name; New Preset keeps it.
     string lastPresetName;
     int saveAsBank = 0;
+    int saveAsReplacementIndex = -1;
+    string replacementBank, replacementName;
+    int replacementIndex = -1;
     string deleteBankName;
     string deletePresetName;
     int deletePresetIndex = -1;
@@ -96,6 +105,14 @@ private:
     // Tells the other instances of each global macro written so far to reload.
     void broadcastSavedMacros(PendingSave& request);
     string saveResultText;
+
+    ofJson savedEditState;
+    std::function<void()> pendingAction;
+    bool actionApproved = false;
+    bool savingBeforeAction = false;
+    bool bypassSaveGuard = false;
+    void cancelPendingAction();
+    ofEventListener presetLoadedListener, presetSavedListener;
 
     bool newPresetCreated;
     bool newPresetRequested = false;

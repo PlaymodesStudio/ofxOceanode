@@ -207,6 +207,9 @@ struct ofxOceanodePresetsController {
     int presetRefreshes=0; void reloadPresetList(){++presetRefreshes;}
     void loadPreset(int,const string&){++loads;}
     string presetNameAt(int i,const string& b) const{auto it=bankPresets.find(b);return it!=bankPresets.end()&&i>=0&&i<(int)it->second.size()?it->second[i]:"";}
+    bool bypassSaveGuard=false,actionApproved=false; function<void()> pendingAction;
+    bool hasUnsavedChanges(){return false;}
+    void requestDestructiveAction(function<void()> fn){pendingAction=fn;}
     void draw(); void update(); void newPreset();
 };
 '''

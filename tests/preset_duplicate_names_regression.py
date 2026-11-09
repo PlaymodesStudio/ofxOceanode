@@ -5,7 +5,7 @@ Splices the Presets controller's folder scan, listeners, load, save, delete and
 path helpers over a mocked openFrameworks and a real temporary Presets folder.
 Covers names that contain "--", loads and saves that must hit the clicked
 number rather than the first name match, renumbering after delete, and the
-Save As duplicate guard. Does not draw ImGui or launch a host.
+Save As replacement targeting and the unconfirmed duplicate guard. Does not draw ImGui or launch a host.
 """
 from pathlib import Path
 import os
@@ -69,6 +69,10 @@ struct ofxOceanodeShared {
     static void setCurrentBankName(string b){ bank = std::move(b); } static string getCurrentBankName(){ return bank; }
     static void setCurrentPresetName(string n){ name = std::move(n); } static string getCurrentPresetName(){ return name; }
     static void presetWasSaved(){ ++saves; }
+    struct Event { ofEventListener newListener(function<void()>){return {};} };
+    static Event& getPresetHasLoadedEvent(){static Event e;return e;}
+    static Event& getPresetWasSavedEvent(){static Event e;return e;}
+    static int getPresetLoadType(){return 0;}
     inline static vector<string> broadcasts; static void macroUpdated(string p){ broadcasts.push_back(std::move(p)); }
 };
 struct ofxOceanodeContainer {
@@ -81,6 +85,7 @@ struct MacroInstance { bool saveGlobalDefinition(bool){ return true; } };
 struct GlobalMacroSaveReview { string name; string globalPath; MacroInstance* instance = nullptr; };
 vector<GlobalMacroSaveReview> collectGlobalMacroSaveReviews(ofxOceanodeContainer&){ return {}; }
 vector<GlobalMacroSaveReview> collapseEquivalentReviews(vector<GlobalMacroSaveReview> r){ return r; }
+constexpr int ofxOceanodePresetLoadType_FullPreset=0;
 struct ofxOceanodeBaseController { explicit ofxOceanodeBaseController(string){} };
 
 PRODUCTION_HELPERS
@@ -92,11 +97,17 @@ struct ofxOceanodePresetsController : ofxOceanodeBaseController {
     void savePreset(int index, const string& bank);
     void beginSavePreset(string name, string bank, int index);
     void finishSavePreset();
+    vector<int> saveAsReplacementTargets(const string& bank, const string& name) const;
     void deletePreset(int index, const string& bank);
     string presetFolderPath(int index, const string& bankName) const;
     string presetNameAt(int index, const string& bankName) const;
     map<string, vector<string>> bankPresets; map<string, int> currentPreset; vector<string> banks; int currentBank = -1;
     enum class PopupRequest { None, NewBank, SaveAs, Delete, ReviewSave, SaveResult }; PopupRequest popupRequest = PopupRequest::None;
+    bool bypassSaveGuard=false,savingBeforeAction=false,actionApproved=false; function<void()> pendingAction;
+    bool hasUnsavedChanges(){return false;}
+    void requestDestructiveAction(function<void()> fn){pendingAction=fn;}
+    void rememberSavedState(){} void cancelPendingAction(){pendingAction={};actionApproved=false;savingBeforeAction=false;}
+    ofEventListener presetLoadedListener,presetSavedListener;
     string lastPresetName;
     enum class MacroSaveChoice { Skip, Save, SaveAs };
     struct PendingSave {
@@ -166,12 +177,26 @@ int main(){
     presets.savePreset(7, "Bank");
     assert(container->saved.size() == 1);
 
-    // Save As refuses an existing name and appends a new number otherwise.
+    // Resolve every matching numbered preset, including legacy names with spaces.
+    assert((presets.saveAsReplacementTargets("Bank", "Foo") == vector<int>{0,2}));
+    assert(presets.saveAsReplacementTargets("Missing", "Foo").empty());
+    assert(presets.saveAsReplacementTargets("Bank", "").empty());
+    presets.bankPresets["Legacy"] = {"My Preset", "My_Preset"};
+    assert((presets.saveAsReplacementTargets("Legacy", "My Preset") == vector<int>{0,1}));
+    assert((presets.saveAsReplacementTargets("Legacy", "My_Preset") == vector<int>{1}));
+    presets.bankPresets.erase("Legacy");
+
+    // Unconfirmed duplicate creation stays blocked. Confirmed Save As uses the
+    // numbered overwrite path, so no extra preset/folder is created.
     presets.beginSavePreset("Foo", "Bank", -1);
     assert(container->saved.size() == 1 && !presets.pendingSave);
     presets.beginSavePreset("New One", "Bank", -1);
     assert(container->saved.back() == "./Presets/Bank/5--New_One" && list.size() == 5 && list.back() == "New_One");
     assert(presets.currentPreset["Bank"] == 4 && presets.newPresetCreated && fs::is_directory("Presets/Bank/5--New_One"));
+    const auto foldersBeforeReplacement = folders();
+    presets.beginSavePreset("", "Bank", 2);
+    assert(container->saved.back() == "./Presets/Bank/3--Foo");
+    assert(list.size() == 5 && folders() == foldersBeforeReplacement);
 
     assert(endsWith(presets.presetFolderPath(0, "Bank"), "/Presets/Bank/1--Foo"));
     assert(endsWith(presets.presetFolderPath(2, "Bank"), "/Presets/Bank/3--Foo"));
@@ -227,6 +252,7 @@ def main():
                       "void ofxOceanodePresetsController::reloadPresetList(",
                       "void ofxOceanodePresetsController::loadPreset(",
                       "void ofxOceanodePresetsController::savePreset(",
+                      "vector<int> ofxOceanodePresetsController::saveAsReplacementTargets(",
                       "void ofxOceanodePresetsController::beginSavePreset(",
                       "void ofxOceanodePresetsController::deletePreset(",
                       "string ofxOceanodePresetsController::presetFolderPath(",
