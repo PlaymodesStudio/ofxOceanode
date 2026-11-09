@@ -55,6 +55,12 @@ public:
     // as with one server. Read when a transition is requested.
     void setAlternateServers(bool alternate) { alternateServers = alternate; }
     bool usesAlternateServers() const { return alternateServers; }
+    // With Alternate: an in-place morph that keeps an SC node holding the
+    // audio island (the engines both presets share) replaces that node, so
+    // the island still moves to a free server, at the price of the sound
+    // morph. Off (the default): such a morph stays in place on one server.
+    void setSwapSharedAudio(bool swap) { swapSharedAudio = swap; }
+    bool usesSwapSharedAudio() const { return swapSharedAudio; }
     // "audio: server 0 -> 1" while a transition moves its audio; empty otherwise.
     const std::string& audioPlacement() const { return audioMove; }
     const std::vector<MacroMixerMorphDetail>& sourceDetails(const std::string& id) const;
@@ -214,7 +220,7 @@ private:
     double startMs = 0, stallMs = 0;
     float durationMs = 0, biPow = 0, lastValue = 0, mixedProgress = 0, heldProgress = 0;
     float morphLogBlend = 1;
-    bool alternateServers = false;
+    bool alternateServers = false, swapSharedAudio = false;
     // Whether resource values carry their graph's placement: Alternate, or a
     // graph placed earlier (Single then keeps it where it is).
     bool placing() const;
@@ -222,6 +228,12 @@ private:
     MacroMixerMixing::PlacementPin placementPin(const Revision& revision) const;
     // Sets the incoming side's spread, pin and reason before a transition.
     void preparePlacement(MacroMixerMixing::Placement& placement, const Revision& origin, const Revision& target, bool inPlace) const;
+    // Whether a morph in place from origin into target replaces a kept node
+    // holding the audio island (previews read the morph as the transition
+    // would prepare it).
+    bool wouldSwapShared(const Revision& origin, const Revision& target) const {
+        MacroMixerMixing::Placement probe; preparePlacement(probe, origin, target, true); return probe.swap;
+    }
     // Records the transition's server move in its Details once it is known.
     void notePlacement();
     std::string audioMove;

@@ -54,6 +54,8 @@ public:
     void draw();
     
     void exit();
+    // Hosts with custom Quit commands should call this before ofExit().
+    void requestQuit();
     
     template<typename T>
     void registerModel(string category = "Default"){
@@ -176,6 +178,7 @@ public:
     void disableRenderHistograms();
 
 private:
+    std::function<void()> restoreCloseHandler;
     void registerDefaultTypes();      // ofxOceanodeDefaultTypes.cpp
     void registerDefaultNodes();      // ofxOceanodeDefaultNodes.cpp
     void registerDefaultRouting();    // ofxOceanodeDefaultRouting.cpp

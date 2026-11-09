@@ -35,6 +35,13 @@ public:
     void setup() override {TestTone::setup();addInput("In");}
     void setInputBus(ofxSCServer* s,scNode*,int bus) override {inputBus[s]=bus;}
 };
+// A node saved with a Server, like SC FFT HD: it pins its source to that server.
+class TestPinned : public TestTone {
+    ofParameter<int> server;
+public:
+    TestPinned():TestTone("Mixer Test Pinned") {}
+    void setup() override {TestTone::setup();addParameter(server.set("Server",0,0,2));}
+};
 static ofxSCServer* setupServer=nullptr;
 static bool synthdefsLoading=false;
 '''
@@ -75,7 +82,7 @@ int main(int argc,char** argv) {
     auto registry=std::make_shared<ofxOceanodeNodeRegistry>();auto types=std::make_shared<ofxOceanodeTypesRegistry>();
     types->registerType<nodePort>("ScBus");ofxOceanodeTypesRegistry::getInstance()->registerType<nodePort>("ScBus");
     registry->registerModel<router<nodePort>>("Router","ScBus",nodePort()); registry->registerModel<TestTone>("SuperCollider/Test");
-    registry->registerModel<TestEffect>("SuperCollider/Test");
+    registry->registerModel<TestEffect>("SuperCollider/Test");registry->registerModel<TestPinned>("SuperCollider/Test");
     registry->registerModel<scOutput>("SuperCollider",managers);registry->registerModel<ofxOceanodeMacroMixer>("Container");registry->registerModel<ofxOceanodeNodeMacro>("Container");
     auto transport=std::make_shared<ofxOceanodeTransport>();transport->setDriverMode(TransportDriverMode::FrameStep);const auto generation=transport->getState().generation;
     ofxOceanodeContainer parent(registry,types,transport); parent.setCanvasID("TestParent");
@@ -236,11 +243,15 @@ int main(int argc,char** argv) {
             return ofJson::parse(R"({"nodes":{"M":{"model":"Macro","settings":{},"graph":{"nodes":{"SC_Mixer_Pro_1":{"model":"SC Mixer Pro","settings":{)"
                 +follow+R"("mixerPro":{"tracks":[{"server":)"+std::to_string(a)+R"(},{"server":)"+std::to_string(b)+R"(}],"buses":[],"returns":[]}}}}}}}})");
         };
-        pin=hooks->pin(mixerPro("",0,0));assert(pin.single&&pin.reason.find("Follow Graph Server")!=std::string::npos);
-        pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"0",)",0,0));assert(pin.single);
+        // Not following, its strips play only on the server they name: the
+        // source is pinned there (a following one goes anywhere; strips on
+        // several servers keep it single).
+        pin=hooks->pin(mixerPro("",1,1));assert(!pin.single&&pin.index==1&&pin.reason.find("Follow Graph Server")!=std::string::npos);
+        pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"0",)",0,0));assert(!pin.single&&pin.index==0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",0,0));assert(!pin.single&&pin.index<0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",1,1));assert(!pin.single&&pin.index<0);
         pin=hooks->pin(mixerPro(R"("Follow_Graph_Server":"1",)",0,1));assert(pin.single);
+        pin=hooks->pin(mixerPro("",0,1));assert(pin.single);
         assert(hooks->carries("SC Mixer Test Tone")&&hooks->carries("Router ScBus")&&!hooks->carries("Router Float"));
         assert(hooks->name(&s1)=="0"&&hooks->name(&s2)=="1"&&hooks->name(&s3).empty());
     }
@@ -276,6 +287,7 @@ int main(int argc,char** argv) {
         const int toneID=tone.getLastSynthID(&s1),toneBus=tone.getOutputBusIndex(&s1,0);
         const auto preview=r.sourceDetails(r.importedMacro(isleB)->id());
         assert(std::any_of(preview.begin(),preview.end(),[](const auto& d){return d.kind=="audio"&&d.message.find("replaced wholesale")!=std::string::npos;}));
+        // Tone kept on both sides keeps the island on the playing server (its sound morphs there).
         const auto sharedPreview=r.sourceDetails(r.importedMacro(shared)->id());
         assert(std::any_of(sharedPreview.begin(),sharedPreview.end(),[](const auto& d){return d.kind=="audio"&&d.message.find("SC_Mixer_Test_Tone_1 is shared by both sides")!=std::string::npos;}));
         r.request(isleB,1000,0,true);r.update(10);
@@ -308,15 +320,51 @@ int main(int argc,char** argv) {
         assert(r.morphingInPlace()&&graph->placement->incoming==&s1&&r.audioPlacement()=="audio: server 1 -> 0");
         recompute(m1,s1);recompute(m2,s2);r.update(610);r.finish();r.update(620);recompute(m1,s1);recompute(m2,s2);r.update(621);r.update(622);
         assert(!r.transitioning()&&graph->placement->instance==&s1&&m1.hasSoundNodes()&&!m2.hasSoundNodes());
-        // Tone is kept on both sides: one server for the whole morph.
+        // Tone is kept on both sides. With Single (and plain Alternate) the
+        // morph keeps it and runs on the one server; with "Alternate, swap
+        // shared" the kept Tone is replaced so the island swaps wholesale and
+        // the incoming audio starts on the free server, the old Tone playing
+        // on until completion.
+        // The Tone re-added by the last morph (the first one retired with isleB).
+        auto& liveTone=static_cast<TestTone&>(graph->container->getDynamicNodes().at("SC Mixer Test Tone").at(1)->getNodeModel());
+        const int liveToneID=liveTone.getLastSynthID(&s1);assert(liveToneID>0);
+        r.setAlternateServers(false);
         r.request(shared,1000,0,true);r.update(700);
         assert(r.morphingInPlace()&&!graph->placement->incoming);
-        assert(r.audioPlacement()=="audio: server 0, stays: SC_Mixer_Test_Tone_1 is shared by both sides");
+        assert(r.audioPlacement()=="audio: server 0, stays: Audio Servers is Single");
         recompute(m1,s1);recompute(m2,s2);r.update(710);
         auto& sharedEffect=static_cast<TestEffect&>(graph->container->getDynamicNodes().at("SC Mixer Test Effect").at(1)->getNodeModel());
-        assert(sharedEffect.getLastSynthID(&s1)>0&&sharedEffect.getLastSynthID(&s2)==-1);
+        assert(sharedEffect.getLastSynthID(&s1)>0&&sharedEffect.getLastSynthID(&s2)==-1&&liveTone.getLastSynthID(&s1)==liveToneID);
         r.finish();r.update(720);recompute(m1,s1);recompute(m2,s2);r.update(721);r.update(722);
         assert(!r.transitioning()&&graph->placement->instance==&s1&&!m2.hasSoundNodes());
+        r.setAlternateServers(true);r.setSwapSharedAudio(true);
+        r.request(isleA,1000,0,true);r.update(750);
+        assert(r.morphingInPlace()&&graph->placement->incoming==&s2&&r.audioPlacement()=="audio: server 0 -> 1");
+        const auto& swapped=r.sourceDetails(r.importedMacro(isleA)->id());
+        assert(std::any_of(swapped.begin(),swapped.end(),[](const auto& d){return d.kind=="replaced"&&d.location=="SC_Mixer_Test_Tone_1"&&d.message.find("swaps shared audio")!=std::string::npos;}));
+        recompute(m1,s1);recompute(m2,s2);r.update(760);
+        TestTone* newTone=nullptr;
+        for(auto& entry:graph->container->getDynamicNodes().at("SC Mixer Test Tone")) if(&entry.second->getNodeModel()!=&liveTone) newTone=static_cast<TestTone*>(&entry.second->getNodeModel());
+        assert(newTone&&newTone->getLastSynthID(&s2)>0&&newTone->getLastSynthID(&s1)==-1&&liveTone.getLastSynthID(&s1)==liveToneID);
+        r.finish();r.update(770);recompute(m1,s1);recompute(m2,s2);r.update(771);r.update(772);
+        assert(!r.transitioning()&&graph->placement->instance==&s2&&!m1.hasSoundNodes()&&m2.hasSoundNodes());
+        // The target's audio is pinned to server 0 (a node saved with Server
+        // 0) while the running graph plays on server 1 and the morph cannot
+        // move its island (its Router feeds another node): in place it would
+        // be silent, so the graph falls back and the second graph starts on
+        // server 0.
+        const auto pinned=scratch+"/isle-pinned";fs::copy(isleB,pinned,fs::copy_options::recursive);
+        auto pinnedModules=ofLoadJson(pinned+"/modules.json");pinnedModules["SC Mixer Test Pinned"]["01"]={0,0};pinnedModules["SC Mixer Test Effect"]["02"]={0,0};ofSaveJson(pinned+"/modules.json",pinnedModules);
+        write(pinned,"SC_Mixer_Test_Pinned_1.json",{{"Freq",110},{"Server",0}});write(pinned,"SC_Mixer_Test_Effect_2.json",{{"Freq",330}});
+        auto pinnedCables=ofLoadJson(pinned+"/connections.json");pinnedCables["Router_ScBus_1"]["Value"]["SC_Mixer_Test_Effect_2"]["In"]=nullptr;ofSaveJson(pinned+"/connections.json",pinnedCables);
+        assert(r.importMacro(pinned));
+        r.request(pinned,1000,0,true);r.update(900);
+        assert(r.morphFallback()&&r.destination()!=graph&&r.destination()->placement->instance==&s1);
+        assert(r.status().find("plays only on server 0")!=std::string::npos&&r.audioPlacement().rfind("audio: server 1 -> 0",0)==0);
+        recompute(m1,s1);recompute(m2,s2);r.update(910);r.finish();r.update(920);
+        recompute(m1,s1);recompute(m2,s2);r.update(921);r.update(922);
+        assert(!r.transitioning()&&r.origin()->placement->instance==&s1);
+        recompute(m1,s1);recompute(m2,s2);r.update(923);assert(m1.hasSoundNodes()&&!m2.hasSoundNodes());
         r.clear();output1.getParameter<nodePort>("In")=nodePort();output2.getParameter<nodePort>("In")=nodePort();
         recompute(m1,s1);recompute(m2,s2);parent.clearContainer();recompute(m1,s1);recompute(m2,s2);assert(TestTone::live==0&&ofxSCSynth::live==0);
     }

@@ -27,7 +27,9 @@ struct Placement {
     std::set<void*> reach;     // Instances whose outputs play the mixer (written by the processor).
     // Set by the runtime before a transition, for the side that comes in:
     bool spread = false;       // It may start on another instance (Audio Servers: Alternate).
+    bool swap = false;         // A kept node holding the island is replaced so it can (Alternate, swap shared).
     int pin = -1;              // The instance index its saved nodes name; -1: none.
+    void* pinInstance = nullptr; // That instance's handle (PlacementHooks::instance), when known.
     std::string reason;        // Why it stays on the origin's instance or is pinned, for Details.
     std::string note;          // Written by the processor: what the incoming side waits for.
 };
@@ -140,6 +142,8 @@ struct PlacementHooks {
     std::function<void(const ofJson& definition)> preload;
     // Short name of an instance handle ("1" for server 1); empty: unknown.
     std::function<std::string(const void* instance)> name;
+    // The handle of the instance with this index; nullptr: none. Optional.
+    std::function<void*(int index)> instance;
 };
 inline void place(Value& value,const std::shared_ptr<Placement>& placement) {
     if(auto* boxed=std::get_if<Object>(&value)) boxed->placement=placement;

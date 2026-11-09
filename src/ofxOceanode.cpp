@@ -6,6 +6,11 @@
 //
 
 #include "ofxOceanode.h"
+#include "ofxOceanodePresetsController.h"
+#if defined(TARGET_GLFW_WINDOW)
+#include "ofAppGLFWWindow.h"
+#include <GLFW/glfw3.h>
+#endif
 #include "ofxOceanodeTheme.h"
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeMenu.h"
@@ -40,6 +45,16 @@
 #endif
 
 namespace {
+#if defined(TARGET_GLFW_WINDOW)
+std::map<GLFWwindow*, std::function<void()>> closeRequests;
+void guardWindowClose(GLFWwindow* window){
+    // GLFW has already raised this flag. Clear it before OF sees it: its
+    // original callback immediately notifies the host's destructive exit().
+    glfwSetWindowShouldClose(window, GLFW_FALSE);
+    auto found = closeRequests.find(window);
+    if(found != closeRequests.end()) found->second();
+}
+#endif
 bool mainWindowIsFullscreen(){
     if(ofGetWindowMode() == OF_FULLSCREEN) return true;
 #if defined(TARGET_OSX)
@@ -84,6 +99,7 @@ ofxOceanode::ofxOceanode(){
 }
 
 ofxOceanode::~ofxOceanode(){
+    if(restoreCloseHandler) restoreCloseHandler();
     // Hosts that do not call exit() must still release the time singleton's
     // graph references before static logger destruction.
     oceanodeTime->shutdown(container);
@@ -100,6 +116,19 @@ void ofxOceanode::setup(){
     scope->setup();
     //controls = make_unique<ofxOceanodeControls>(container);
     controls = make_unique<ofxOceanodeControls>(container,&canvas, oscReceiverPort);
+#if defined(TARGET_GLFW_WINDOW)
+    if(auto window = std::dynamic_pointer_cast<ofAppGLFWWindow>(ofGetMainLoop()->getCurrentWindow())){
+        auto* native = window->getGLFWWindow();
+        const auto previous = glfwSetWindowCloseCallback(native, guardWindowClose);
+        closeRequests[native] = [this](){ requestQuit(); };
+        restoreCloseHandler = [weak = std::weak_ptr<ofAppGLFWWindow>(window), native, previous](){
+            closeRequests.erase(native);
+            if(auto alive = weak.lock()){
+                if(alive->getGLFWWindow() == native) glfwSetWindowCloseCallback(native, previous);
+            }
+        };
+    }
+#endif
     help = make_unique<ofxOceanodeHelp>(container);
     nodePool = make_unique<ofxOceanodeNodePool>(container, &canvas);
     //        timelines.emplace_back("Phasor_1/Beats_Div");
@@ -242,6 +271,11 @@ void ofxOceanode::draw(){
     gui.end();
     gui.draw();
     theme->afterRender();
+}
+
+void ofxOceanode::requestQuit(){
+    if(auto presets = controls->get<ofxOceanodePresetsController>())
+        presets->requestDestructiveAction([](){ ofExit(); });
 }
 
 void ofxOceanode::exit(){
@@ -815,13 +849,11 @@ void ofxOceanode::receiveOsc(){
 #endif
 
 void ofxOceanode::loadPreset(std::string presetPathRelativeToData){ //call preset via path
-    ofxOceanodeShared::startedLoadingPreset();
-    container->loadPreset(presetPathRelativeToData);
-    ofxOceanodeShared::finishedLoadingPreset();
+    controls->get<ofxOceanodePresetsController>()->requestLoadPreset(presetPathRelativeToData);
 }
 
 void ofxOceanode::loadPreset(std::string bank, std::string name){ //call preset via bank and name
-    auto toSendPair = make_pair(name, bank);
+    auto toSendPair = make_pair(bank, name);
     container->loadPresetEvent.notify(toSendPair);
 }
 

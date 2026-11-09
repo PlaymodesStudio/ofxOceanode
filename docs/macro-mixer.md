@@ -5,7 +5,7 @@ It is registered under **Experimental → MacroMixer**. Declare router names, ty
 and Input/Output roles in its Inspector; add Macro source folders; choose Mode
 (Mix or Morph) and Target and press **Start!**. Duration_ms, Bi Pow, Log Blend and **Stop!**
 (finish now) control a fade, and Progress shows it. Each output has its own
-type-specific policy and options. **Audio Servers** (Single or Alternate)
+type-specific policy and options. **Audio Servers** (Single, Alternate or Alternate, swap shared)
 decides which SuperCollider servers a transition's audio runs on (see
 *SuperCollider servers* below).
 
@@ -130,7 +130,8 @@ Rendering runs only during draw. Internal processing follows native frame order;
 a downstream draw-driven node can observe the mixed image on the following frame.
 
 Each source has a collapsible header in the node color (stronger while it
-runs) with its index, name and badges in green, and refresh (circular arrow),
+runs) with its index, name and badges (Running, Destination, Queued, Selected)
+in the warmest colour of its Details, green when none is orange or red, and refresh (circular arrow),
 move up/down and **-** (remove) on the right. Choose the source with Target. Expanded, every source has the same layout.
 Paths start at the data folder; hover for the full path.
 
@@ -142,7 +143,8 @@ Paths start at the data folder; hover for the full path.
   title is orange when a node is replaced and red when the graph falls back. It lists
   added/removed/replaced nodes, the receiving node/parameter and both endpoints of every
   changed connection with its policy, and every fallback reason, including mixes
-  skipped because another incompatibility forced fallback. A transition's
+  skipped because another incompatibility forced fallback. Red entries come
+  first, then orange, then the rest in plan order. A transition's
   Details open with a context line, "From A to B, prepared in N ms": the time
   the Start frame spent aligning and planning the target, staging its added
   nodes and loading its timelines, all before the fade clock starts. A long
@@ -280,7 +282,8 @@ the same; when they change, the graph falls back (`changes drivers with
 several cabled Portals`), as it does when the target's Portals on one bus were
 saved with different values. Global buses keep the rules below.
 
-A Macro's **Color** is cosmetic: a different saved colour in a nested Macro is
+A Macro's **Color** and the order of its pins (**RouterSortOrder**) are
+cosmetic: a different saved colour or pin order in a nested Macro is
 not a configuration change and never makes a morph replace the Macro or fall
 back. The running Macro keeps its colour. A library Macro takes its title
 from the library, so its saved **Local Name** is ignored the same way; a local
@@ -327,6 +330,17 @@ alone, and published controls are blended with the rest of the sound. Voices
 and Channels are Structural, so a change there replaces the polycombBox. Show is
 skipped.
 
+SC Mixer Pro blends its `mixerPro` block on the running node: every strip's
+level, balance, mute and solo, EQ, the HP, compressor, saturation, echo,
+reverb and width inserts, sends, sidechain and the master section. Numbers
+glide (frequencies and times in log), switches, modes and routing jump half
+way, and published strip controls are blended with the mix rather than by
+the control morph. Track, bus, return and channel counts, each strip's
+server and Follow Graph Server are Structural, so a change there replaces
+the mixer. Names and colours are not sound and are left alone. This is what
+lets two audio presets that share their engines morph in place without
+running two mixers.
+
 When the running graph cannot be reused, the morph falls back to a crossfade.
 A fresh destination Macro is loaded next to the running one and both keep
 running. The destination's matching controls start at the captured current
@@ -340,9 +354,11 @@ output shows `Macro fall`. The current implementation falls back for:
 - Changed Router settings (names, bounds, Inspector settings) or Portal
   settings other than the bus (a Portal on another bus is unmatched instead).
   These publish the Macro interface or a shared service and cannot run twice.
-- Unmatched Router additions or removals in an existing container. These
-  require reconciliation of the existing published interface; routers inside a
-  whole newly added Macro load through its native lifecycle.
+- Unmatched Router additions or removals in the source's own container. These
+  require reconciliation of the mixer's published interface; routers inside a
+  whole newly added Macro load through its native lifecycle, and a Router
+  added or removed inside a running nested Macro replaces that Macro (its
+  pins change), as a different saved pin does.
 - An added Global Portal whose bus is live (a running Portal of the same
   type and Name) when loading it would set that bus: it has an incoming
   cable, or nothing else in the target drives the bus, so its saved value is
@@ -596,8 +612,11 @@ pull upstream. With one server, every transition builds the destination's
 audio on the server that is playing the origin: it allocates buses, loads
 SynthDefs, creates and orders the new synths and runs both graphs until the
 fade completes, which glitches the playing audio. **Audio Servers** (saved
-with the node; Single or Alternate, default Alternate) puts the incoming
-audio on a server that is not playing instead.
+with the node; Single, Alternate or Alternate, swap shared; default Alternate) puts the incoming
+audio on a server that is not playing instead. A morph in place that keeps
+audio nodes (two presets sharing their engines) stays on its server and
+morphs their sound; a third choice, **Alternate, swap shared**, replaces such
+kept nodes so the island always moves (see *Morph in place* below).
 
 **The patch needs one SC Output per server**, each fed by the mixer's ScBus
 output (Server 0, Server 1, and Server 2 if it is booted). A server without
@@ -652,30 +671,53 @@ other server. At completion the graph moves to that server before the
 native cable is restored (the rebuilds are coalesced to the next update), so
 the playing server never builds the island and the island's synths stay
 where they are. A node kept on both sides would have to run on two servers
-and be rebuilt at completion, so then the morph keeps one server, as before,
-with the reason in Details ("SC_Tone_1 is shared by both sides").
+and be rebuilt at completion, so then the morph keeps one server, with the
+reason in Details ("SC_Tone_1 is shared by both sides"), and the kept
+nodes morph their sound there. This is the sound-morph case: in BLOOBS
+2_CELLS_AUDIO ↔ 2_GHOSTS_BIONIC_AUDIO the engines, the Mixer Pro and the
+audio Macro match, so only the box that differs runs twice during the fade.
+Keep what matches really matching (the same Macro kind, Follow Graph Server
+on in both), since every replaced node runs twice on that server. With
+**Alternate, swap shared** such a kept node is replaced instead (Details:
+"audio island is shared by both sides … swapped wholesale"), so the island
+always moves to a free server and the audio crossfades between the two
+islands rather than morphing: the choice when a preset alone loads a server
+heavily. A shared node the morph cannot replace on its own (inside a nested
+Macro, a Router feeding other nodes) keeps one server either way.
 
 What stays on one server:
 
 - A mixer with an ScBus **Input** router: its outer source would run on both
   servers.
 - A source holding an ScBus Portal (it shares audio with the rest of the
-  patch), or an SC Mixer Pro (its tracks name their servers, and each `Out
-  Sn` carries one server's mix) unless that Mixer Pro has **Follow Graph
-  Server** on (Inspector) with every strip on one server. With it on, its
+  patch), or an SC Mixer Pro whose strips name several servers (each `Out
+  Sn` carries one server's mix).
+- A source is **pinned** to a server when its nodes can play only there: SC
+  nodes saved with a **Server** (SC FFT HD, Buffer Allocator, A2k and the
+  other analysis nodes), and an SC Mixer Pro without **Follow Graph Server**
+  (Inspector) whose strips all name one server, since such a Mixer Pro
+  builds no strips on any other server and its output stays silent there.
+  The incoming side goes to the pinned server when an SC Output there plays
+  the mixer, even with Audio Servers on Single (the running graph may sit on
+  another server after an earlier Alternate transition); nodes naming two
+  servers keep the source single. The reason shows in Details. When a morph
+  in place cannot move its audio island (a kept SC node) and the running
+  graph plays on another server than the pin, the morph would be silent
+  there, so the graph falls back and the second graph starts on the pinned
+  server ("plays only on server 0 while the running graph plays on another
+  server").
+- With Follow Graph Server on and every strip on one server, a Mixer Pro's
   strips play on whichever server builds the graph, writing the output of
   their own server index (`Out S1` for strips on S1), so the source moves
   like any other; keep the cable on that output. BLOOBS 2_CELLS_AUDIO
   (`Macro_12`) and 2_GHOSTS_BIONIC_AUDIO (`Macro_7`) need it switched on
-  and saved to alternate.
-- A source whose SC nodes are saved with a **Server** (SC FFT HD, Buffer
-  Allocator, A2k and the other analysis nodes) is placed on that server, if
-  an SC Output there plays the mixer; nodes naming two servers keep it
-  single. The reason shows in Details.
+  and saved to alternate; with it on in only one of them, every transition
+  between the two lands on server 0.
 - Trigger and Texture policies are unaffected; a MacroMixer inside a source
   is reached only on its graph's server, so it stays where its graph is.
 - With Single, a graph that was never placed runs exactly as before; a
-  graph placed while Alternate was on stays on its server.
+  graph placed while Alternate was on stays on its server unless the
+  target is pinned elsewhere.
 
 **SynthDefs.** A free server may never have loaded what the destination
 needs, and its first rebuild would wait for `/d_loadDir` and `/sync` with the
@@ -719,6 +761,9 @@ dialog, which still appears when Start! activates that source.
 
 The **Status** text output is one short, coloured word. During a morph it
 describes that morph; otherwise, in Morph mode, the next morph into Target.
+On the node and in the Inspector its colour is raised to the warmest Details
+of the running, destination, queued and selected sources, so a finished
+transition that replaced a node keeps the word orange while that source runs.
 
 | Status | Colour | Meaning |
 |---|---|---|

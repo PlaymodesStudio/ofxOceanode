@@ -23,6 +23,9 @@ public:
     // Load after node presets exist; save participates in the core save transaction.
     virtual bool loadPreset(const std::string&) = 0;
     virtual bool savePreset(const std::string&) const = 0;
+    // Read-only authored content, excluding clocks and window/view state.
+    // Queried at save/load and before discarding work, never every frame.
+    virtual ofJson presetEditState() const { return ofJson(); }
     virtual bool getPlayOnPresetLoad() const = 0;
     virtual bool isBpmAutomationEnabled() const = 0;
     virtual bool preservesSecondsOnBpmChange() const = 0;

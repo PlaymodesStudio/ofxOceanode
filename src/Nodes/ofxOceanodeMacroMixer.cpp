@@ -239,9 +239,13 @@ void ofxOceanodeMacroMixer::setup() {
     addParameter(logBlend.set("Log Blend", 1, 0, 1));
     // With an SC Output per SuperCollider server, Alternate starts each
     // transition's incoming audio on a server that is not playing and
-    // crossfades across servers; Single keeps everything on one server.
-    // Alternate acts as Single while only one server plays the mixer.
-    addParameterDropdown(audioServers, "Audio Servers", 1, {"Single", "Alternate"});
+    // crossfades across servers; a morph in place that keeps SC nodes (the
+    // engines both presets share) stays on its server, morphing their
+    // sound. "Alternate, swap shared" replaces such kept nodes instead, so
+    // the island always moves, at the price of the sound morph. Single keeps
+    // everything on one server. Alternate acts as Single while only one
+    // server plays the mixer.
+    addParameterDropdown(audioServers, "Audio Servers", 1, {"Single", "Alternate", "Alternate, swap shared"});
     addParameter(transition.set("Start!"));
     addParameter(finish.set("Stop!"));
     addOutputParameter(summary.set("Status", "No sources"), transient);
@@ -249,7 +253,7 @@ void ofxOceanodeMacroMixer::setup() {
     if(hostContainer) {
         runtime = std::make_unique<MacroMixerRuntime>(*hostContainer);
         MacroMixerContract empty; empty.routers.clear(); runtime->setContract(empty);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         if(std::find(liveMixers.begin(),liveMixers.end(),this) == liveMixers.end()) liveMixers.push_back(this);
     }
     listeners.push(target.newListener([this](int& index) {
@@ -269,19 +273,19 @@ void ofxOceanodeMacroMixer::setup() {
         if(selectedID == heading) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     listeners.push(transition.newListener([this] {
         if(!runtime || !getActive()) return;
         inspectorError.clear();
         runtime->setMorphLogBlend(logBlend);
-        runtime->setAlternateServers(audioServers == 1);
+        runtime->setAlternateServers(audioServers >= 1); runtime->setSwapSharedAudio(audioServers == 2);
         runtime->requestMacro(selectedID, duration, biPow, mode == 1);
     }));
     // Also at rest: Alternate keeps the running graph on one server even when
     // SC Outputs on several servers play the mixer.
-    listeners.push(audioServers.newListener([this](int& value) { if(runtime) runtime->setAlternateServers(value == 1); }));
+    listeners.push(audioServers.newListener([this](int& value) { if(runtime) { runtime->setAlternateServers(value >= 1); runtime->setSwapSharedAudio(value == 2); } }));
     listeners.push(finish.newListener([this] { if(runtime && getActive()) runtime->finish(); }));
 }
 
@@ -540,7 +544,7 @@ bool ofxOceanodeMacroMixer::moveImportedMacro(const std::string& id, size_t inde
 
 bool ofxOceanodeMacroMixer::drawInspectorParameter(ofAbstractParameter& parameter) {
     if(!parameter.isReferenceTo(state)) return false;
-    ImGui::TextColored(healthColor(health()), "%s", shortStatus().c_str());
+    ImGui::TextColored(healthColor(displayHealth()), "%s", shortStatus().c_str());
     ImGui::TextWrapped("%s", state.get().c_str());
     return true;
 }
@@ -555,7 +559,7 @@ bool ofxOceanodeMacroMixer::drawNodeParameter(ofxOceanodeAbstractParameter& para
     ImGui::Dummy(ImVec2(widgetWidth, ImGui::GetFrameHeight()));
     const auto& padding = ImGui::GetStyle().FramePadding;
     ImGui::GetWindowDrawList()->AddText(ImVec2(origin.x + padding.x, origin.y + padding.y),
-        ImGui::ColorConvertFloat4ToU32(healthColor(health())), summary.get().c_str());
+        ImGui::ColorConvertFloat4ToU32(healthColor(displayHealth())), summary.get().c_str());
     ImGui::EndGroup();
     return true;
 }
@@ -805,7 +809,12 @@ bool ofxOceanodeMacroMixer::drawSourceHeader(const MacroMixerRevision& macro, si
         }
         ImGui::EndTooltip();
     }
-    if(!badges.empty()) { ImGui::SameLine(); ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", badges.c_str()); }
+    if(!badges.empty()) {
+        // Badges take the warmest colour of this source's Details, green when none is orange or red.
+        const auto badgeHealth = detailsHealth(macro.id());
+        ImGui::SameLine();
+        ImGui::TextColored(badgeHealth == Health::Ok ? ImVec4(0, 1, 0, 1) : healthColor(badgeHealth), "%s", badges.c_str());
+    }
     // Refresh, up, down and remove, right-aligned on the header row.
     const float gap = em * .25f, square = ImGui::GetFrameHeight();
     const float buttons = 3 * square + ImGui::CalcTextSize("-").x + style.FramePadding.x * 2 + 3 * gap;
@@ -875,7 +884,16 @@ void ofxOceanodeMacroMixer::drawSource(const MacroMixerRevision& macro, bool fad
         const bool open = ImGui::TreeNode("Details");
         if(worst) ImGui::PopStyleColor();
         if(open) {
-            for(size_t n = 0; n < details.size(); ++n) {
+            // Issues first: graph fallbacks, then replaced nodes, then the rest in
+            // plan order. The context line stays on top as the list's title.
+            std::vector<size_t> order;
+            for(size_t n = 0; n < details.size(); ++n) order.push_back(n);
+            const auto rank = [&](size_t n) {
+                const auto& kind = details[n].kind;
+                return kind == "context" ? 0 : kind == "fallback" || kind == "skipped" ? 1 : kind == "replaced" ? 2 : 3;
+            };
+            std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return rank(a) < rank(b); });
+            for(const auto n : order) {
                 const auto& detail = details[n];
                 ImGui::PushID(int(n));
                 if(detail.kind == "context") {
@@ -1094,11 +1112,27 @@ ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::health() const {
         into = runtime->destinationID();
     } else if(mode == 1 && runtime->origin() && selectedID != runtime->currentID()) into = selectedID;
     if(into.empty()) return Health::Ok;
+    return detailsHealth(into);
+}
+ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::detailsHealth(const std::string& id) const {
+    // Details only exist in Morph mode. The running source is read only once a
+    // transition recorded its Details: a preview from itself says nothing.
+    if(!runtime || id.empty() || !(mode == 1 || runtime->morphMode())) return Health::Ok;
+    if(id == runtime->currentID() && !runtime->hasTransitionDetails(id)) return Health::Ok;
     auto result = Health::Ok;
-    for(const auto& detail : runtime->sourceDetails(into)) {
+    for(const auto& detail : runtime->sourceDetails(id)) {
         if(detail.kind == "fallback" || detail.kind == "skipped") return Health::GraphFallback;
         if(detail.kind == "replaced") result = Health::NodeFallback;
     }
+    return result;
+}
+ofxOceanodeMacroMixer::Health ofxOceanodeMacroMixer::displayHealth() const {
+    auto result = health();
+    if(!runtime || result == Health::Neutral) return result;
+    // Reads only the badged sources' Details; health() already computed the
+    // next target's, and the others are recorded or cheap while a fade runs.
+    for(const auto& id : {runtime->currentID(), runtime->destinationID(), runtime->queuedID(), selectedID})
+        result = std::max(result, detailsHealth(id));
     return result;
 }
 std::string ofxOceanodeMacroMixer::shortStatus() const {
@@ -1175,7 +1209,7 @@ void ofxOceanodeMacroMixer::loadBeforeConnections(ofJson& json) {
         // Release both old graphs before staging to retain the two-graph cap.
         if(runtime->transitioning()) runtime->clear();
         auto candidate = std::make_unique<MacroMixerRuntime>(*hostContainer);
-        candidate->setAlternateServers(audioServers == 1); // Its listener follows a later recall of the control.
+        candidate->setAlternateServers(audioServers >= 1); candidate->setSwapSharedAudio(audioServers == 2); // Its listener follows a later recall of the control.
         if(!candidate->restoreState(saved)) {
             inspectorError = "Cannot restore MacroMixer";
             for(const auto& e : candidate->diagnostics()) inspectorError += "\n" + e.file + ": " + e.message;

@@ -494,6 +494,8 @@ int main(int argc,char** argv) {
         assert(m.getParameter<int>("Audio Servers")==1 && m.mixerRuntime()->usesAlternateServers());
         m.getParameter<int>("Audio Servers")=0; assert(!m.mixerRuntime()->usesAlternateServers());
         m.getParameter<int>("Audio Servers")=1; assert(m.mixerRuntime()->usesAlternateServers());
+        m.getParameter<int>("Audio Servers")=2; assert(m.mixerRuntime()->usesAlternateServers()&&m.mixerRuntime()->usesSwapSharedAudio());
+        m.getParameter<int>("Audio Servers")=1; assert(!m.mixerRuntime()->usesSwapSharedAudio());
         { auto reserved=c; reserved.routers[0].name="Audio Servers"; assert(!m.setRouterContract(reserved)); }
         { MacroMixerRuntime bare(parent); assert(!bare.usesAlternateServers()); }
         m.getParameter<float>("Duration_ms")=0; m.getParameter<void>("Start!").trigger(); parent.update();

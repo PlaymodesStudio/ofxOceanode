@@ -52,6 +52,17 @@ with `euclideanGenerator` as the class, and `"Generators"` as the category name.
 - **Help > Search nodes** searches registered nodes and their descriptions.
   **Help > AI assistant** answers questions or proposes a small patch through
   Requesty, using the same credentials as Formula and DynGen.
+- **Unsaved changes** prompts before New Preset, loading another preset or
+  closing the main GLFW window. **Save changes...** opens Save Preset As and
+  the global-macro review; an existing name can replace a preset after explicit
+  confirmation, through the same macro review as menu Save. **Don't Save**
+  continues; **Cancel** keeps the patch.
+  Canceling Save As/review or a failed preset write also cancels the pending
+  action. Playback and timeline zoom/scroll do not count as edits. Hosts with
+  custom Quit commands must call `oceanode.requestQuit()` instead of `ofExit()`;
+  `exit()` is final cleanup and is too late to ask. Low-level container loads
+  remain available for internal macro/clipboard operations; interactive host
+  loads should use `oceanode.loadPreset(...)`.
 - **Layouts** manages named preset layouts and reusable global layouts. Preset
   layouts include window visibility. See [Layouts](docs/layouts.md).
 - **Custom GUIs** are provided by the optional `ofxOceanodeCustomGui` addon.

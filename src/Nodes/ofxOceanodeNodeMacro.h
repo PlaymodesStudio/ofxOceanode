@@ -96,12 +96,13 @@ public:
 	bool isSink() const override { return false; }
 	// Macros have their own snapshots of their routers.
 	bool supportsNodeSnapshots() const override { return false; }
-	// The node colour is cosmetic: a different saved colour must not stop a
-	// MacroMixer morph from reusing the running Macro. A library Macro's title
-	// comes from the library, so its Local Name is unused and cosmetic too.
+	// The node colour and the order of the pins (RouterSortOrder) are
+	// cosmetic: a different saved value must not stop a MacroMixer morph from
+	// reusing the running Macro. A library Macro's title comes from the
+	// library, so its Local Name is unused and cosmetic too.
 	MorphKeys morphKeys() const override {
-		if(presetManager.isLocal()) return {{}, {"Color"}};
-		return {{}, {"Color", "Local_Name"}};
+		if(presetManager.isLocal()) return {{}, {"Color", "RouterSortOrder"}};
+		return {{}, {"Color", "Local_Name", "RouterSortOrder"}};
 	}
 	bool drawNodeParameter(ofxOceanodeAbstractParameter& parameter, float labelWidth, float widgetWidth) override;
 	std::string getNodeTitleSuffix() const override {
