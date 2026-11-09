@@ -27,7 +27,7 @@
 //    Base Note     (C .. B): it never leaves that octave (cf. Fit Notes In Range)
 //    Detune        each voice's own fixed random offset within +-cents, never quantized
 //    Glide         seconds a Transpose, Scale or Shift change takes to reach the
-//                  notes still sounding (SuperCollider synths; MIDI jumps)
+//                  notes still sounding (synths; a MIDI note takes the value of its instant)
 //  The inspector lists the destinations with a tick per feature (SampleBox
 //  and SlicerBox start unticked). Several Global Pitch nodes show one state.
 //
@@ -52,7 +52,7 @@ public:
                       "(the axis between its minor and major third), then Transpose (semitones) is added (Mod 12: wrapped "
                       "into the note's own octave from Base Note), then each "
                       "voice's own random Detune (within +-cents). Glide: seconds a change takes to reach the sounding "
-                      "notes (SuperCollider synths). The inspector chooses which destinations follow each one.";
+                      "notes (synths; a MIDI note takes the value of its instant). The inspector chooses which destinations follow each one.";
     }
     ~globalPitch() {
         auto& all = instances();
@@ -178,6 +178,10 @@ public:
         sendShift();
         sendLowShift();
     }
+
+    // the glide: the registry's lagged values move each frame while a Global
+    // Pitch node exists (the last one leaving sets Glide to 0)
+    void update(ofEventArgs&) override { ofxOceanodeGlobalPitch::advance(); }
 
     // presets saved as "Low Scale Bypass" (its earlier name), and from before
     // it existed, when Scale Bypass turned both scales off

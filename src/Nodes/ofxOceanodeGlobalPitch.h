@@ -162,16 +162,53 @@ public:
         valuesChanged(Detune);
     }
     // seconds a change of transpose, scale or shift takes to reach the notes
-    // still sounding. Only an audio engine that glides its own values (the
-    // SuperCollider synths: scGlobalPitch) can follow it; values applied once
-    // (MIDI notes, apply()) jump.
+    // still sounding. The registry keeps a lagged copy of the transpose and of
+    // both offset tables (lag(), moved by advance() each frame from the Global
+    // Pitch node) that apply() reads, so a destination that resends its notes
+    // on valueChanged glides along with the SuperCollider buses (scGlobalPitch).
+    // A value applied once (a MIDI note) takes the lagged value of its instant.
     static float glide() { return state().glide; }
     static void setGlide(float seconds) {
         seconds = std::max(0.0f, seconds);
         if(state().glide == seconds) return;
         state().glide = seconds;
         for(auto& l : changeListeners()) l();
+        if(seconds <= 0.0f) advance();   // the sounding notes jump to where they were heading
     }
+    // Each frame: moves the lagged transpose and offset tables towards their
+    // targets like SuperCollider's Lag (60 dB in glide seconds) and tells the
+    // destinations that apply the values themselves to resend their notes.
+    // Several callers per frame are harmless (wall-clock time).
+    static void advance() {
+        auto& s = state();
+        Lag& l = lag();
+        const double now = ofGetElapsedTimeMicros() * 1e-6;   // double: a float's steps grow coarse after days
+        const double dt = std::max(0.0, now - l.lastTime);
+        l.lastTime = now;
+        const float transposeTarget = s.transpose;
+        const std::array<float, 12> offsetsTarget = lagTarget(false), lowTarget = lagTarget(true);
+        bool transposeMoved = false, scaleMoved = false;
+        auto move = [&](float& value, float target) {
+            if(value == target) return false;
+            if(s.glide <= 0.0f || dt <= 0.0) { value = target; return true; }
+            const float k = 1.0f - std::exp(float(std::log(0.001) * dt / s.glide));
+            value += (target - value) * k;
+            if(std::abs(target - value) < 1e-3f) value = target;
+            return true;
+        };
+        transposeMoved = move(l.transpose, transposeTarget);
+        for(int pc = 0; pc < 12; pc++) {
+            scaleMoved = move(l.offsets[pc], offsetsTarget[pc]) || scaleMoved;
+            scaleMoved = move(l.lowOffsets[pc], lowTarget[pc]) || scaleMoved;
+        }
+        if(!transposeMoved && !scaleMoved) return;
+        for(auto& f : followers()) if(f.valueChanged) {
+            if((transposeMoved && follows(f.node, Transpose)) || (scaleMoved && follows(f.node, Scale))) f.valueChanged();
+        }
+    }
+    // the lagged transpose and offset tables apply() reads (the targets while no glide runs)
+    static float laggedTranspose() { return lag().transpose; }
+    static const std::array<float, 12>& laggedHarmonyOffsets(bool low) { return low ? lag().lowOffsets : lag().offsets; }
     // called after any value changes (an audio engine resends what its synths read)
     static void onValuesChanged(std::function<void()> f) { changeListeners().push_back(std::move(f)); }
 
@@ -198,18 +235,20 @@ public:
             const float r = std::round(v);
             const int pc = ((int(r) % 12) + 12) % 12;
             const bool low = splitOn() && r < split();
-            if(harmonyOn(low)) v += harmonyOffsets(low)[pc];
+            if(harmonyOn(low)) v += laggedHarmonyOffsets(low)[pc];
         }
         if(follows(node, Transpose)) v = transposed(v);
         if(withDetune && spread(node)) v += detune() * 0.01f * random(node, channel);
         return v;
     }
-    // a note transposed: with modulo 12, wrapped into the octave from the base that holds it
+    // a note transposed (by the lagged transpose while a glide runs): with
+    // modulo 12, wrapped into the octave from the base that holds it
     static float transposed(float v) {
-        if(!state().wrap) return v + transpose();
+        const float t = laggedTranspose();
+        if(!state().wrap) return v + t;
         const float base = float(state().wrapBase);
         const float window = base + std::floor((v - base) / 12.0f) * 12.0f;
-        return v + transpose() - 12.0f * std::floor((v + transpose() - window) / 12.0f);
+        return v + t - 12.0f * std::floor((v + t - window) / 12.0f);
     }
     // apply(), kept inside the control's declared range: a transpose must not push
     // a note past what the destination is built for
@@ -350,11 +389,27 @@ private:
         std::array<std::map<std::string, bool>, NumFeatures> overrides;
     };
     static State& state() { static State s; return s; }
+    // what the SuperCollider glide synth lags on its buses: the transpose and
+    // each side's offset table as written (zeros while that side's harmony is off)
+    struct Lag {
+        float transpose = 0.0f;
+        std::array<float, 12> offsets{}, lowOffsets{};
+        double lastTime = 0.0;
+    };
+    static Lag& lag() { static Lag l; return l; }
+    static std::array<float, 12> lagTarget(bool low) { return harmonyOn(low) ? harmonyOffsets(low) : std::array<float, 12>{}; }
+    static void snapLag() {
+        Lag& l = lag();
+        l.transpose = state().transpose;
+        l.offsets = lagTarget(false);
+        l.lowOffsets = lagTarget(true);
+    }
     static std::vector<Follower>& followers() { static std::vector<Follower> f; return f; }
     static std::vector<std::function<void()>>& changeListeners() { static std::vector<std::function<void()>> l; return l; }
     static std::map<ofxOceanodeNodeModel*, std::vector<float>>& randoms() { static std::map<ofxOceanodeNodeModel*, std::vector<float>> r; return r; }
 
     static void valuesChanged(Feature feature) {
+        if(state().glide <= 0.0f) snapLag();   // no glide: apply() reads the new values at once
         for(auto& l : changeListeners()) l();
         for(auto& f : followers()) if(f.valueChanged && follows(f.node, feature)) f.valueChanged();
     }
