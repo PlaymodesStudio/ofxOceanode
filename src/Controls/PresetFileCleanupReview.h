@@ -121,6 +121,8 @@ public:
         if(!open && !ImGui::IsPopupOpen("Review leftover node files")) return;
         if(open){ ImGui::OpenPopup("Review leftover node files"); open = false; }
         ImGui::SetNextWindowSizeConstraints(ImVec2(650, 0), ImVec2(900, 700));
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(!ImGui::BeginPopupModal("Review leftover node files", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
         ImGui::TextWrapped("Saved canvas: %s", pathToScan.c_str());
         ImGui::TextWrapped("These files are absent from the saved node lists. Review them before removal. Save your patch first to keep any current edits.");

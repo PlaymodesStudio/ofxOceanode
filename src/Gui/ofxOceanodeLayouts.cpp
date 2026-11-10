@@ -421,6 +421,8 @@ void ofxOceanodeLayouts::drawPresetLayoutPopup(){
     for(const auto action : {PresetLayoutPopup::Save, PresetLayoutPopup::Overwrite, PresetLayoutPopup::Rename, PresetLayoutPopup::Delete}){
         const char* title = presetLayoutPopupTitle(action);
         const bool confirmOnly = action == PresetLayoutPopup::Overwrite || action == PresetLayoutPopup::Delete;
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(!ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) continue;
         bool submit = false;
         if(action == PresetLayoutPopup::Overwrite){
@@ -467,6 +469,8 @@ void ofxOceanodeLayouts::drawGlobalLayoutPopup(){
         ImGui::OpenPopup("Save Global Layout");
         openSaveGlobalLayoutPopup = false;
     }
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Save Global Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::Text("Enter a name for the layout:");
         ImGui::InputText("##layoutname", globalName, sizeof(globalName));

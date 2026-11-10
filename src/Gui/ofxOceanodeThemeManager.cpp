@@ -628,6 +628,8 @@ void ofxOceanodeThemeManager::drawPopups(){
         ImGui::OpenPopup("Save Theme##modal");
         openSaveThemePopup = false;
     }
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Save Theme##modal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::Text("Enter a name for the theme:");
         ImGui::SetNextItemWidth(260);

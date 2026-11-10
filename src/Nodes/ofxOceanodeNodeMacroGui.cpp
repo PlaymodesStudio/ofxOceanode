@@ -198,6 +198,8 @@ void ofxOceanodeNodeMacro::renderMacroLoadDialog() {
 	const ImVec2 display = ImGui::GetIO().DisplaySize;
 	ImGui::SetNextWindowSize(ImVec2(std::min(480.f, display.x * .85f), std::min(520.f, display.y * .85f)), ImGuiCond_Appearing);
 	MacroDialogAppearance::Style appearance;
+	ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(!ImGui::BeginPopupModal("Load Macro Contents", nullptr, ImGuiWindowFlags_NoResize)) return;
 
 	bool activateSelection = false;
@@ -355,6 +357,8 @@ void ofxOceanodeNodeMacro::renderMacroDeleteDialog() {
 		guiState.openDeletePopup = false;
 	}
 	MacroDialogAppearance::Style appearance;
+	ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(!ImGui::BeginPopupModal("Delete Macro?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
 	ImGui::Text("Macro: %s", guiState.deleteMacroName.c_str());
 	ImGui::TextDisabled("%s", guiState.deleteMacroPath.c_str());
@@ -401,6 +405,8 @@ void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
 	const float width = std::min(720.f, display.x * .85f);
 	ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(width, display.y * .85f));
 	MacroDialogAppearance::Style appearance;
+	ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(!ImGui::BeginPopupModal("Unsaved Macro Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
 	const auto& review = guiState.unsavedReview;
 	if(guiState.unsavedForLoad){
@@ -552,6 +558,8 @@ void ofxOceanodeNodeMacro::renderMacroSaveDialog() {
 	}
 	ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
 	MacroDialogAppearance::Style appearance;
+	ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(!ImGui::BeginPopupModal("Save Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
 	if(guiState.closeSavePopup){
 		guiState.closeSavePopup = false;
@@ -781,6 +789,8 @@ void ofxOceanodeNodeMacro::renderInspectorInterface() {
 	}
 
 	// Handle clear all confirmation popup
+	ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(ImGui::BeginPopupModal("Clear All Snapshots?", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::Text("Are you sure you want to clear all snapshots?\nThis action cannot be undone.");
 		ImGui::Separator();

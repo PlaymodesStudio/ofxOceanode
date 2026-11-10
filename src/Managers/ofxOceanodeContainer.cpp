@@ -78,6 +78,8 @@ namespace {
         }
 
         ImGui::SetNextWindowSizeConstraints(ImVec2(760.0f, 0.0f), ImVec2(760.0f, FLT_MAX));
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(ImGui::BeginPopupModal(popupId, nullptr,
                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)){
             const auto& error = pendingConnectionErrorDialogs.front();

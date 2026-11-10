@@ -599,6 +599,7 @@ void ofxOceanodeGlobalVariablesController::drawDialogs(){
     }
 
     const ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("New Global Variables Group", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
@@ -623,6 +624,7 @@ void ofxOceanodeGlobalVariablesController::drawDialogs(){
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Rename Global Variables Group", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         auto group = findGroup(renameGroupName);
@@ -662,6 +664,7 @@ void ofxOceanodeGlobalVariablesController::drawDialogs(){
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
     ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("New Variable", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         auto group = findGroup(newVariableGroupName);

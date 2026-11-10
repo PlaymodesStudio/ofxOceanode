@@ -249,6 +249,8 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         headerControlHovered |= ImGui::IsItemHovered() || ImGui::IsItemActive();
 		ImGui::PopStyleColor(4);
 		
+		ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 		if (ImGui::BeginPopupModal("Delete?", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 		{
 			ImGui::Text("%s", (moduleName + "\n").c_str());

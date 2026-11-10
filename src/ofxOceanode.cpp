@@ -810,6 +810,8 @@ void ofxOceanode::showHelpPopUp()
 {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize;
     bool p_open = true;
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Here are some tips:", &p_open, flags)){
         ImGui::Text("%s", " - Press RIGHT CLICK to open new node popup");
         ImGui::Spacing();

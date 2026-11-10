@@ -356,6 +356,8 @@ void ofxOceanodePresetsController::drawPopups(){
     }
     popupRequest = PopupRequest::None;
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         const string name = ofxOceanodeShared::getCurrentPresetName();
         ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
@@ -379,6 +381,8 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Add New Bank", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
         ImGui::SetNextItemWidth(ImGui::GetFontSize() * 22.0f);
@@ -403,6 +407,8 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Save Preset As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         if(ImGui::IsWindowAppearing()){
             ImGui::SetKeyboardFocusHere();
@@ -467,6 +473,8 @@ void ofxOceanodePresetsController::drawPopups(){
             cancelPendingAction();
             closeSaveAs = true;
         }
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(ImGui::BeginPopupModal("Replace Preset?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
             ImGui::Text("Bank: %s", replacementBank.c_str());
             ImGui::Text("Preset: %d | %s", replacementIndex + 1, replacementName.c_str());
@@ -493,6 +501,8 @@ void ofxOceanodePresetsController::drawPopups(){
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Delete Preset?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::Text("Bank: %s", deleteBankName.c_str());
         ImGui::Text("Preset: %s", deletePresetName.c_str());
@@ -512,6 +522,8 @@ void ofxOceanodePresetsController::drawPopups(){
     const float resultWidth = std::min(620.0f, ImGui::GetIO().DisplaySize.x * 0.85f);
     ImGui::SetNextWindowSizeConstraints(ImVec2(resultWidth, 0.0f),
                                         ImVec2(resultWidth, ImGui::GetIO().DisplaySize.y * 0.85f));
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Preset Save Result", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         ImGui::TextWrapped("%s", saveResultText.c_str());
         if(ImGui::Button("OK") || ImGui::IsKeyPressed(ImGuiKey_Enter)) ImGui::CloseCurrentPopup();
@@ -809,6 +821,8 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
     ImGui::SetNextWindowSizeConstraints(ImVec2(reviewWidth, 0.0f),
                                         ImVec2(reviewWidth, ImGui::GetIO().DisplaySize.y * 0.9f));
     ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     const bool open = ImGui::BeginPopupModal("Review Global Macros", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::PopStyleColor();
     if(!open) return;

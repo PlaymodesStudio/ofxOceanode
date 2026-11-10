@@ -2390,6 +2390,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
         {
             MacroDialogAppearance::Style appearance;
+            ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             if(ImGui::BeginPopupModal("New Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
                 if(!pendingNewMacro){
                     ImGui::CloseCurrentPopup();
@@ -2419,6 +2421,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         ImGui::SetNextWindowSize(ImVec2(420, 0), ImGuiCond_Appearing);
         {
             MacroDialogAppearance::Style appearance;
+            ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
             if(ImGui::BeginPopupModal("Encapsulate Macro", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
                 if(!pendingEncapsulation){
                     ImGui::CloseCurrentPopup();
@@ -2469,6 +2473,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
             openEncapsulationPrompt = false;
             ImGui::OpenPopup("Timeline Tracks##encapsulation");
         }
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(ImGui::BeginPopupModal("Timeline Tracks##encapsulation", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
             ImGui::TextUnformatted("These nodes are driven by the timeline.");
             ImGui::TextUnformatted("Where should their timeline tracks go?");
@@ -2492,6 +2498,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         if(open_portalize_name_popup){
             ImGui::OpenPopup("Portalize Output");
         }
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if(ImGui::BeginPopupModal("Portalize Output", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
             if(ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
             const bool namedEntered = ImGui::InputText("Name", portalizeNameBuffer, sizeof(portalizeNameBuffer),
@@ -2591,6 +2599,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         }
 
         // Draw New Node menu
+        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
         // Close the whole modal on Escape, even while Search or a submenu owns focus.

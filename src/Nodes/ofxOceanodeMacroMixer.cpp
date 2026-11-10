@@ -166,7 +166,11 @@ void ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog() {
         if(!waiting.empty()) { owner = mixer; break; }
     }
     if(!owner) {
-        if(ImGui::IsPopupOpen(popupId) && ImGui::BeginPopupModal(popupId)) { ImGui::CloseCurrentPopup(); ImGui::EndPopup(); }
+        if(ImGui::IsPopupOpen(popupId)) {
+            ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+            ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+            if(ImGui::BeginPopupModal(popupId)) { ImGui::CloseCurrentPopup(); ImGui::EndPopup(); }
+        }
         return;
     }
     if(!ImGui::IsPopupOpen(popupId)) {
@@ -177,6 +181,8 @@ void ofxOceanodeMacroMixer::drawPendingBlockedNodeDialog() {
     MacroDialogAppearance::Style style;
     const float em = ImGui::GetFontSize();
     ImGui::SetNextWindowSizeConstraints(ImVec2(36*em,0),ImVec2(36*em,FLT_MAX));
+    ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(!ImGui::BeginPopupModal(popupId,nullptr,ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) return;
     const auto& node = *waiting.front();
     const auto answer = [&](const MacroMixerDiagnostic& blocked, ActionKind kind) {
