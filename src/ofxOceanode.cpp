@@ -42,9 +42,41 @@
 #if defined(TARGET_OSX)
 #include <objc/message.h>
 #include <objc/runtime.h>
+#include <crt_externs.h>
 #endif
+#include <fstream>
+#include <iostream>
 
 namespace {
+// Recorded before main(): openFrameworks changes the working directory on
+// startup, and a relative preset argument is relative to the launch folder.
+const std::filesystem::path launchDirectory = [](){
+    std::error_code error;
+    return std::filesystem::current_path(error);
+}();
+
+// The process arguments, read without the host app's main() passing them on.
+std::vector<std::string> processArguments(){
+    std::vector<std::string> arguments;
+#if defined(TARGET_OSX)
+    const int count = *_NSGetArgc();
+    char** values = *_NSGetArgv();
+    for(int i = 1; i < count; i++) arguments.emplace_back(values[i]);
+#elif defined(TARGET_WIN32)
+    if(__argv != nullptr)
+        for(int i = 1; i < __argc; i++) arguments.emplace_back(__argv[i]);
+#elif defined(TARGET_LINUX)
+    std::ifstream commandLine("/proc/self/cmdline", std::ios::binary);
+    std::string argument;
+    bool first = true;
+    while(std::getline(commandLine, argument, '\0')){
+        if(!first) arguments.push_back(argument);
+        first = false;
+    }
+#endif
+    return arguments;
+}
+
 #if defined(TARGET_GLFW_WINDOW)
 std::map<GLFWwindow*, std::function<void()>> closeRequests;
 void guardWindowClose(GLFWwindow* window){
@@ -170,10 +202,89 @@ void ofxOceanode::setup(){
     // Retain the host window identity even when output windows become current.
     titleWindow = std::dynamic_pointer_cast<ofAppGLFWWindow>(ofGetMainLoop()->getCurrentWindow());
 #endif
+    readStartupArguments();
+}
+
+// Usage: <app> [path/to/preset] [delay=ms]
+//   path/to/preset  preset folder to open on startup: absolute, relative to the
+//                   folder the app was launched from, or relative to the data folder.
+//   delay=ms        milliseconds to wait, once the app has finished setting up,
+//                   before opening it.
+// Oceanode routes ofLog to its in-app console, so the outcome is also printed
+// to the terminal the app was launched from.
+void ofxOceanode::readStartupArguments(){
+    const auto arguments = processArguments();
+    for(size_t i = 0; i < arguments.size(); i++){
+        const std::string& arg = arguments[i];
+        if(arg.empty()) continue;
+        if(arg[0] == '-'){
+            // macOS / Xcode switches such as "-psn_0_1234" or "-NSDocumentRevisionsDebugMode YES".
+            if(arg.rfind("-NS", 0) == 0 || arg.rfind("-Apple", 0) == 0) i++;
+            continue;
+        }
+        if(arg.rfind("delay=", 0) == 0){
+            try{
+                startupPreset.delayMs = std::stoull(arg.substr(6));
+            }catch(const std::exception&){
+                std::cerr << "[Oceanode] Ignoring '" << arg << "': delay must be a number of milliseconds" << std::endl;
+            }
+            continue;
+        }
+        if(!startupPreset.path.empty()){
+            std::cerr << "[Oceanode] Ignoring extra argument '" << arg << "'" << std::endl;
+            continue;
+        }
+        std::filesystem::path path(arg);
+        std::error_code error;
+        if(path.is_relative() && std::filesystem::is_directory(launchDirectory / path, error)){
+            path = std::filesystem::weakly_canonical(launchDirectory / path, error);
+            if(error) path = launchDirectory / arg;
+        }
+        startupPreset.path = path.string();
+        while(startupPreset.path.size() > 1 && startupPreset.path.back() == '/') startupPreset.path.pop_back();
+    }
+    if(!startupPreset.path.empty()){
+        std::cout << "[Oceanode] Will open preset '" << startupPreset.path << "' "
+                  << startupPreset.delayMs << " ms after startup" << std::endl;
+    }
+}
+
+void ofxOceanode::updateStartupPreset(){
+    if(!startupPreset.path.empty()){
+        // The first update comes after the host has registered its nodes.
+        if(!startupPreset.timing){
+            startupPreset.timing = true;
+            startupPreset.firstUpdateMs = ofGetElapsedTimeMillis();
+        }
+        if(ofGetElapsedTimeMillis() - startupPreset.firstUpdateMs < startupPreset.delayMs) return;
+        if(ofDirectory::doesDirectoryExist(startupPreset.path)){
+            std::cout << "[Oceanode] Opening startup preset '" << startupPreset.path << "'" << std::endl;
+            loadPreset(startupPreset.path);
+            startupPreset.requested = startupPreset.path;
+            startupPreset.requestFrame = ofGetFrameNum();
+        }else{
+            ofLogError("ofxOceanode") << "Startup preset folder not found: '" << startupPreset.path << "'";
+            std::cerr << "[Oceanode] Startup preset folder not found: '" << startupPreset.path << "'" << std::endl;
+        }
+        startupPreset.path.clear();
+        return;
+    }
+    // The load is queued and runs on a later update: report how it ended.
+    if(!startupPreset.requested.empty()){
+        if(ofxOceanodeShared::getCurrentPresetPath() == startupPreset.requested && !ofxOceanodeShared::isPresetLoading()){
+            std::cout << "[Oceanode] Startup preset loaded" << std::endl;
+            startupPreset.requested.clear();
+        }else if(ofGetFrameNum() - startupPreset.requestFrame > 120){
+            ofLogError("ofxOceanode") << "Startup preset not loaded: '" << startupPreset.requested << "'";
+            std::cerr << "[Oceanode] Startup preset NOT loaded: '" << startupPreset.requested << "'" << std::endl;
+            startupPreset.requested.clear();
+        }
+    }
 }
 
 void ofxOceanode::update(){
     container->getProfilingSession()->nextFrame();
+    updateStartupPreset();
     if(help) help->update();
     for(auto &item : configMenuItems)
         if(item.second.update) item.second.update();

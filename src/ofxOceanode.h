@@ -234,6 +234,18 @@ private:
     void receiveOsc();
 #endif
     
+    // Startup preset from the command line: <app> [path/to/preset] [delay=ms]
+    struct StartupPreset{
+        std::string path;           // waiting to be requested
+        uint64_t delayMs = 0;
+        uint64_t firstUpdateMs = 0;
+        bool timing = false;
+        std::string requested;      // requested, waiting for the load to finish
+        uint64_t requestFrame = 0;
+    } startupPreset;
+    void readStartupArguments();
+    void updateStartupPreset();
+
     ofEventListener presetLoadedListener;
     ofEventListener presetSavedListener;
     bool presetCanvasCenterPending = false;
