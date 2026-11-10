@@ -219,11 +219,12 @@ void ofxOceanode::releaseStartupSplash(){
     if(splash) splash->release();
 }
 
-// Usage: <app> [path/to/preset] [delay=ms]
+// Usage: <app> [path/to/preset] [delay=ms] [show]
 //   path/to/preset  preset folder to open on startup: absolute, relative to the
 //                   folder the app was launched from, or relative to the data folder.
 //   delay=ms        milliseconds to wait, once the app has finished setting up,
 //                   before opening it.
+//   show            start in show mode, whatever the saved configuration says.
 // Oceanode routes ofLog to its in-app console, so the outcome is also printed
 // to the terminal the app was launched from.
 void ofxOceanode::readStartupArguments(){
@@ -234,6 +235,11 @@ void ofxOceanode::readStartupArguments(){
         if(arg[0] == '-'){
             // macOS / Xcode switches such as "-psn_0_1234" or "-NSDocumentRevisionsDebugMode YES".
             if(arg.rfind("-NS", 0) == 0 || arg.rfind("-Apple", 0) == 0) i++;
+            continue;
+        }
+        if(arg == "show"){
+            windows->setShowMode(true);
+            std::cout << "[Oceanode] Starting in show mode" << std::endl;
             continue;
         }
         if(arg.rfind("delay=", 0) == 0){

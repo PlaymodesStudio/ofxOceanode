@@ -244,7 +244,7 @@ private:
     void receiveOsc();
 #endif
     
-    // Startup preset from the command line: <app> [path/to/preset] [delay=ms]
+    // Startup preset from the command line: <app> [path/to/preset] [delay=ms] [show]
     struct StartupPreset{
         std::string path;           // waiting to be requested
         uint64_t delayMs = 0;
