@@ -37,6 +37,7 @@ class ofxOceanodeNodePool;
 class ofxOceanodeLayouts;
 class ofxOceanodeThemeManager;
 class ofxOceanodeAppConfig;
+class ofxOceanodeSplash;
 
 class ofxOceanode {
 public:
@@ -54,6 +55,15 @@ public:
     void draw();
     
     void exit();
+
+    // The startup splash is shown by every app. Call before setup() to opt out.
+    void setStartupSplashEnabled(bool enabled){ startupSplashEnabled = enabled; }
+    // An addon that starts something slow (an audio server, say) holds the
+    // splash open until it is ready. Each hold needs one release; the splash
+    // gives up waiting after a timeout.
+    void holdStartupSplash();
+    void releaseStartupSplash();
+
     // Hosts with custom Quit commands should call this before ofExit().
     void requestQuit();
     
@@ -253,6 +263,8 @@ private:
     std::unique_ptr<ofxOceanodeLayouts> layouts;
     std::unique_ptr<ofxOceanodeThemeManager> theme;
     std::unique_ptr<ofxOceanodeAppConfig> appConfig;
+    std::unique_ptr<ofxOceanodeSplash> splash;
+    bool startupSplashEnabled = true;
 };
 
 #endif /* ofxOceanode_h */

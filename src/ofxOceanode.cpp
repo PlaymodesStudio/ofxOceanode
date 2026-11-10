@@ -28,6 +28,7 @@
 #include "ofxOceanodeLayouts.h"
 #include "ofxOceanodeThemeManager.h"
 #include "ofxOceanodeAppConfig.h"
+#include "ofxOceanodeSplash.h"
 #include "Controls/PresetFileCleanupReview.h"
 #include <algorithm>
 #include <climits>
@@ -203,6 +204,19 @@ void ofxOceanode::setup(){
     titleWindow = std::dynamic_pointer_cast<ofAppGLFWWindow>(ofGetMainLoop()->getCurrentWindow());
 #endif
     readStartupArguments();
+    // Last: the splash tees the logger that the controls installed above.
+    if(startupSplashEnabled){
+        splash = std::make_unique<ofxOceanodeSplash>();
+        splash->setup(*this);
+    }
+}
+
+void ofxOceanode::holdStartupSplash(){
+    if(splash) splash->hold();
+}
+
+void ofxOceanode::releaseStartupSplash(){
+    if(splash) splash->release();
 }
 
 // Usage: <app> [path/to/preset] [delay=ms]
@@ -390,6 +404,7 @@ void ofxOceanode::requestQuit(){
 }
 
 void ofxOceanode::exit(){
+    if(splash) splash->exit();
     layouts->saveDocking(ofxOceanodeShared::getCurrentPresetPath());
     oceanodeTime->shutdown(container);
     container->clearContainer();
