@@ -552,13 +552,16 @@ int main(int argc,char** argv) {
     // addition, so the new cable blends from the fixed value to the added
     // node's output instead of sweeping through the old node's saved ranges.
     // One shared neighbour role (the same driver into the same port) keeps
-    // the pair even though its output moved.
+    // the pair even though its output moved. A spare cable-less Ranger keeps
+    // the type repeated, as in BLOOBS: a model type that is unique on both
+    // sides anchors its pair before any saved ID is consulted.
     {
         auto saveReuse=[&](const std::string& folder,int kind) { // 0: source, 1: disjoint target, 2: target sharing the driver
             ofxOceanodeContainer c(registry,types,transport); c.setCanvasID("IDReuse");
             auto& out=floating(c,1); out.getParameter<std::string>("Name")="Value";
             c.createNode(std::make_unique<MorphProbe>(),1);
             assert(c.createConnectionFromInfo("Morph_Probe_1","Output","Router_f_1","Value"));
+            c.createNode(std::make_unique<ranger>(),1);
             auto& range=c.createNode(std::make_unique<ranger>(),2).getNodeModel();
             range.getParameter<std::vector<float>>("Min Out")={kind?10.f:-10.f}; range.getParameter<std::vector<float>>("Max Out")={kind?10.f:-10.f};
             if(kind==1) { c.createNode(std::make_unique<oscillator>(),1); assert(c.createConnectionFromInfo("Oscillator_1","Output","Ranger_2","Input")); }
@@ -579,7 +582,7 @@ int main(int argc,char** argv) {
         r.request(to,1000,0,true); r.update(10); assert(r.morphingInPlace()&&r.destination()==original);
         r.update(510); near(probe(original).driven,5); // Fixed 0 -> the added Ranger's 10, never 0 from a -10..10 sweep.
         r.finish(); r.update(520); near(probe(original).driven,10);
-        const auto& rangers=original->container->getDynamicNodes().at("Ranger"); assert(rangers.size()==1&&!rangers.count(2));
+        const auto& rangers=original->container->getDynamicNodes().at("Ranger"); assert(rangers.size()==2&&rangers.count(1)&&!rangers.count(2));
     }
     // The user's 2/3/4 layout: the texture clock is 3, 2 or 4, while the same
     // IDs can instead drive newly added modulation chains. Its live connection

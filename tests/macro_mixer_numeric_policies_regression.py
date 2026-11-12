@@ -59,8 +59,9 @@ int main(int argc,char** argv) {
     reject([&]{policies.mix("Integer","linear",1.f,2.f,.5);});
     reject([&]{policies.mix("Boolean","switch",0,1,.5);});
     reject([&]{policies.mix("Boolean","linear",false,true,.5);});
-    reject([&]{vector("index_zero",Vec(4097,0),{},.5);});
-    reject([&]{vector("resample",{1},{2},.5,{{"size",4097}});});
+    assert(vector("index_zero",Vec(maxVectorSize,INT_MAX),Vec(maxVectorSize,INT_MAX),.5)==Vec(maxVectorSize,INT_MAX));
+    reject([&]{vector("index_zero",Vec(maxVectorSize+1,0),{},.5);});
+    reject([&]{vector("resample",{1},{2},.5,{{"size",maxVectorSize+1}});});
     reject([&]{gate(false,true,.5,2);});
     assert(policies.policy("Integer").id=="linear" && policies.policy("Integer Vector").id=="resample_length");
     assert(policies.policy("Boolean").id=="switch");
