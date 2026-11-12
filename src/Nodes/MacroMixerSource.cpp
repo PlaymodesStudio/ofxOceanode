@@ -1820,6 +1820,9 @@ void MacroMixerSource::Graph::prepareMorph(const MorphSnapshot& captured, const 
     if(originGraph) alignMorphValues(originGraph->liveMorphDefinition.is_null() ? originGraph->revision->sourceDefinition() : originGraph->liveMorphDefinition,
         revision->sourceDefinition(),captured,{},{},aligned);
     const auto& origin=originGraph ? aligned : captured;
+    // This graph's own Project Tracks set what they move from their first
+    // write: the control morph must not take those to their saved values.
+    collectMorphStateDriven();
     const auto target = captureMorphValues();
     for(const auto& entry : target) {
         const auto start = origin.find(entry.first);
@@ -1880,14 +1883,30 @@ void MacroMixerSource::Graph::clearMorphAutomation() {
 // through the morph have a start: added and replaced nodes start on the
 // timeline's own values. Discrete controls (gates, switches, dropdowns) and
 // note lanes follow the timeline at once.
+void MacroMixerSource::Graph::collectMorphStateDriven(std::unordered_set<ofxOceanodeAbstractParameter*>* into) {
+    morphStateDriven.clear();
+    std::unordered_set<ofxOceanodeAbstractParameter*> driven;
+    std::set<ofxOceanodeAutomationExtension*> asked;
+    auto ask=[&](ofxOceanodeContainer* from) {
+        if(auto* automation=from ? from->getAutomationExtension() : nullptr)
+            if(asked.insert(automation).second) automation->collectStateDrivenParameters(driven);
+    };
+    ask(container.get());
+    if(morphTopology) for(const auto& edit:morphTopology->edits) ask(edit.container);
+    morphStateDriven.insert(driven.begin(),driven.end());
+    if(into) into->insert(driven.begin(),driven.end());
+}
 void MacroMixerSource::Graph::startMorphAutomation() {
     clearMorphAutomation();
+    morphStateDriven.clear();
     if(!morphTopology) return;
     std::unordered_set<ofxOceanodeAbstractParameter*> bound;
     std::set<ofxOceanodeAutomationExtension*> asked;
     for(const auto& edit:morphTopology->edits)
         if(auto* automation=edit.container ? edit.container->getAutomationExtension() : nullptr)
             if(asked.insert(automation).second) automation->collectBoundParameters(bound);
+    // What a Project Track moves blends in like a bound control.
+    collectMorphStateDriven(&bound);
     if(bound.empty()) return;
     auto state=std::make_shared<MacroMixerMorphAutomation>();
     state->policies=morphPolicies;
@@ -2073,7 +2092,7 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
         // A control the destination's timeline drives follows that timeline
         // (blended in by morphAutomation): the timeline re-asserts its value
         // after every node update anyway.
-        if(!p || p->isTimelined()) continue;
+        if(!p || p->isTimelined() || morphStateDriven.count(p)) continue;
         const auto& start = morphStart.at(entry.first);
         std::visit([&](const auto& target) {
             using T = std::decay_t<decltype(target)>;

@@ -163,6 +163,9 @@ public:
     }
     // Drops the filter set with ofxOceanodeParameter<T>::setAutomationFilter.
     virtual void clearAutomationFilter(){}
+    // A player that writes only when its own value changes (a Project Track)
+    // keeps writing while one is set: what the filter returns moves on.
+    virtual bool hasAutomationFilter() const {return false;}
     ofxOceanodeAbstractConnection* getInConnection(){return inConnections.empty() ? nullptr : inConnections.back();};
     const std::vector<ofxOceanodeAbstractConnection*>& getInConnections() const {return inConnections;}
 
@@ -367,6 +370,7 @@ public:
     // control was instead of jumping to its own value.
     void setAutomationFilter(std::function<ParameterType(const ParameterType&)> filter){automationFilter = std::move(filter);}
     void clearAutomationFilter() override {automationFilter = nullptr;}
+    bool hasAutomationFilter() const override {return static_cast<bool>(automationFilter);}
     ParameterType filterAutomationValue(const ParameterType& value) const {return automationFilter ? automationFilter(value) : value;}
 
     void setDefaultValue(ParameterType v){defaultValue = v;};

@@ -41,6 +41,11 @@ public:
     virtual void drawCanvasMenu(ofxOceanodeContainer& /*canvas*/) {}
     virtual void removeParameterBindings(ofxOceanodeAbstractParameter&) = 0;
     virtual void collectBoundParameters(std::unordered_set<ofxOceanodeAbstractParameter*>&) const = 0;
+    // Parameters a timeline drives without a binding (a Project Track moving
+    // between its keyframes). They stay hand-editable and are not flagged
+    // isTimelined; a MacroMixer morph leaves them to the timeline as it does
+    // bound ones.
+    virtual void collectStateDrivenParameters(std::unordered_set<ofxOceanodeAbstractParameter*>&) const {}
     // Nodes moved to another canvas (encapsulated into a macro, ...): their
     // parameters' timeline paths, old -> new, so bindings follow them.
     virtual void retargetParameterPaths(const std::map<std::string, std::string>& /*oldToNew*/) {}

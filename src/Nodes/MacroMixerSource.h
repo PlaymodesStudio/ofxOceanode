@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <set>
+#include <unordered_set>
 class abstractRouter;
 
 // A nonempty node names a saved node whose macroMixerBlocker() stops the load;
@@ -120,6 +121,10 @@ public:
         // Controls the destination's timelines drive: each timeline write
         // blends from the control's start value by the morph's progress.
         std::shared_ptr<MacroMixerMorphAutomation> morphAutomation;
+        // Controls a destination timeline drives without a binding (a Project
+        // Track): applyMorph leaves them to it. Compared, never dereferenced.
+        std::unordered_set<const ofxOceanodeAbstractParameter*> morphStateDriven;
+        void collectMorphStateDriven(std::unordered_set<ofxOceanodeAbstractParameter*>* into=nullptr);
         void startMorphAutomation();
         void clearMorphAutomation();
         // Router id -> its port, kept while the container's nodes and the
