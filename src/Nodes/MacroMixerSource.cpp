@@ -650,8 +650,9 @@ PortalBus portalBus(const ofJson& entry) {
 }
 
 // Match instances before comparing settings. Saved IDs are local labels, not
-// cross-preset identities. Named interfaces and unique model types anchor the
-// correspondence; port roles propagate it through repeated model types.
+// cross-preset identities. Named interfaces anchor the correspondence and
+// port roles propagate it; a saved ID, then a model type unique on both
+// sides, pair what is left, each as far as the cables allow.
 using MorphMatches = std::map<std::string,std::string>; // target -> running
 MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
     const auto& before=original.at("nodes"); const auto& after=target.at("nodes");
@@ -678,8 +679,6 @@ MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
     index(before,oldTypes,oldNames); index(after,newTypes,newNames);
     for(const auto& entry:newNames) if(entry.second.size()==1 && oldNames[entry.first].size()==1)
         match(oldNames[entry.first].front(),entry.second.front());
-    for(const auto& entry:newTypes) if(entry.second.size()==1 && oldTypes[entry.first].size()==1)
-        match(oldTypes[entry.first].front(),entry.second.front());
     const auto a=savedEdges(original.at("connections")),b=savedEdges(target.at("connections"));
     auto propagate=[&]() {
         bool changed=false;
@@ -734,14 +733,66 @@ MorphMatches matchMorphNodes(const ofJson& original, const ofJson& target) {
         }
         return false;
     };
+    // The nodes a node reaches along its cables, one way: its neighbours, and
+    // on through those `open` lets through.
+    auto reach=[](const auto& edges,const std::string& key,bool upstream,auto&& open) {
+        std::set<std::string> seen; std::vector<std::string> todo{key};
+        while(!todo.empty()) {
+            const auto at=todo.back(); todo.pop_back();
+            for(const auto& e:edges) {
+                if(e[upstream?2:0]!=at) continue;
+                const auto& next=e[upstream?0:2];
+                if(next==key || !seen.insert(next).second) continue;
+                if(open(next)) todo.push_back(next);
+            }
+        }
+        return seen;
+    };
+    // The only node of its model type on both sides is one node, whatever its
+    // saved ID, unless its cables say it plays another role: both are cabled
+    // upstream and downstream and, each way, what one reaches has nothing to
+    // do with what the other does. Unmatched nodes are looked through (a node added to or removed
+    // from the chain keeps its ends the same node), ports are not compared (a
+    // rewired node is still that node), and two unmatched nodes of one model
+    // may yet be each other (a part of the graph no interface reaches). So
+    // BLOOBS' Ranger_2 is refused here as it is by ID, when it is the only
+    // Ranger too, and a lone node between other neighbours is replaced, not
+    // swept from one job's settings into the other's cables.
+    auto contradicted=[&](const std::string& oldKey,const std::string& newKey) {
+        const auto model=after.at(newKey).at("model").get<std::string>();
+        if(model.rfind("Router ",0)==0 || model.rfind("Portal ",0)==0) return false;
+        for(const bool upstream:{true,false}) {
+            const auto olds=reach(a,oldKey,upstream,[&](const std::string& k){return !used.count(k);});
+            const auto news=reach(b,newKey,upstream,[&](const std::string& k){return !matches.count(k);});
+            // A side with no cable this way says nothing: a sink whose
+            // driver was replaced, or a source sent elsewhere, is that node.
+            if(olds.empty() || news.empty()) return false;
+            for(const auto& n:news) {
+                const auto known=matches.find(n);
+                if(known!=matches.end()) { if(olds.count(known->second)) return false; continue; }
+                const auto& kind=after.at(n).at("model");
+                for(const auto& o:olds) if(!used.count(o) && before.at(o).at("model")==kind) return false;
+            }
+        }
+        return true;
+    };
     // Port roles above take precedence when an ID was reused for a different
-    // role. Each kept pair can anchor further roles, which can support more IDs.
+    // role. Each kept pair can anchor further roles, which can support more
+    // IDs; unique model types come last, when the IDs have said all they can,
+    // so their neighbours are known by then.
     for(bool changed=true;changed;) {
         changed=false;
         for(auto it=after.begin();it!=after.end();++it)
             if(before.contains(it.key()) && !matches.count(it.key()) && !used.count(it.key()) && supported(it.key()))
                 changed=match(it.key(),it.key()) || changed;
-        if(changed) while(propagate()) {}
+        if(changed) { while(propagate()) {} continue; }
+        for(const auto& entry:newTypes) {
+            const auto old=oldTypes.find(entry.first);
+            if(entry.second.size()!=1 || old==oldTypes.end() || old->second.size()!=1) continue;
+            const auto& oldKey=old->second.front(); const auto& newKey=entry.second.front();
+            if(matches.count(newKey) || used.count(oldKey) || contradicted(oldKey,newKey)) continue;
+            if(match(oldKey,newKey)) { changed=true; while(propagate()) {} }
+        }
     }
     return matches;
 }
