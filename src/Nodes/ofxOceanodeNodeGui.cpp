@@ -795,18 +795,35 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         }
         
         } else {
-            // Ordinary nodes at zoom ≤ 45%: reserve their cached layout without widgets.
-            if(cachedContentHeight > 0.0f){
-                ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, cachedContentHeight * zoomLevel));
+            // A node loaded at low zoom has no measured content yet. Reserve an
+            // estimated row height until the detailed GUI can measure it, so its
+            // pins are initialized in screen space on the very first frame.
+            int visibleRows = 0;
+            for(int i = 0; i < (int)getParameters().size(); ++i){
+                auto& parameter = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+                if(!isHeaderToggle(parameter) && node.isParameterShownInGui(parameter) &&
+                   !(parameter.getFlags() & ofxOceanodeParameterFlags_NoGuiWidget)) ++visibleRows;
+            }
+            const float contentHeight = cachedContentHeight > 0.0f ? cachedContentHeight : visibleRows * 20.0f;
+            if(contentHeight > 0.0f){
+                ImGui::Dummy(ImVec2(nodeWidthText + nodeWidthWidget, contentHeight * zoomLevel));
                 // Distribute pin Y positions evenly across the dummy area so connections
                 // remain anchored at sensible positions even when widgets are not rendered.
                 auto numParams = getParameters().size();
                 for(int i = 0; i < (int)numParams; i++){
                     if(isHeaderToggle(static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i)))) continue;
-                    float yPos = numParams == 1 ? (cachedContentHeight * zoomLevel) / 2.0f
-                                                : (cachedContentHeight * zoomLevel) * ((float)i / (numParams - 1));
+                    float yPos = numParams == 1 ? (contentHeight * zoomLevel) / 2.0f
+                                                : (contentHeight * zoomLevel) * ((float)i / (numParams - 1));
                     inputPositions[i]  = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
                     outputPositions[i] = glm::vec2(0, ImGui::GetItemRectMin().y + yPos);
+                }
+            }else{
+                // Nodes with only hidden or widgetless parameters still need
+                // valid endpoints, even though they have no body rows.
+                const float pinY = ImGui::GetCursorScreenPos().y;
+                for(int i = 0; i < (int)getParameters().size(); ++i){
+                    if(isHeaderToggle(static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i)))) continue;
+                    inputPositions[i] = outputPositions[i] = glm::vec2(0, pinY);
                 }
             }
         } // end if(renderGui)
