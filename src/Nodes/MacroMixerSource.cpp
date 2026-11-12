@@ -1,4 +1,5 @@
 #include "MacroMixerSource.h"
+#include "ofxOceanodeMorph.h"
 #include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeNodeRegistry.h"
 #include "ofxOceanodeShared.h"
@@ -363,33 +364,11 @@ using MorphPath = MacroMixerSource::MorphPath;
 
 bool morphEditable(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p,
                    ofxOceanodeNodeMacro& owner, const MacroMixerSource::Graph& graph, bool root) {
-    // Portal receivers have no incoming cable, but their values are driven by
-    // the shared Portal service. Writing saved values here would feed them back
-    // into their senders and compete with the graph's actual controls.
-    if(model.nodeName().rfind("Portal ",0)==0) return false;
-    // A node's own window is opened from MacroMixer, never by a source's save.
-    if(auto* toggle=model.getWindowToggle()) if(toggle->getName()==p.getName()) return false;
-    // A saved key owned by the node's sound morph must never also receive
-    // generic parameter interpolation, even when it has a published port.
-    const auto keys=model.morphKeys();
-    if(std::find(keys.blended.begin(),keys.blended.end(),p.getEscapedName())!=keys.blended.end()) return false;
-    const auto hint=model.morphHint(p);
-    if(hint==ofxOceanodeNodeModel::MorphHint::Skip || hint==ofxOceanodeNodeModel::MorphHint::Structural) return false;
-    // OF reports numeric vectors as non-serializable; the native Oceanode
-    // preset saver explicitly handles them, so use that same exception here.
-    const bool numericVector=p.valueType()==typeid(std::vector<float>).name() || p.valueType()==typeid(std::vector<int>).name();
-    if(p.hasInConnection() || (!p.isSerializable() && !numericVector) || p.isReadOnly() ||
-       (p.getFlags() & (ofxOceanodeParameterFlags_DisableInConnection |
-                        ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly))) return false;
-    if(auto* router = dynamic_cast<abstractRouter*>(&model)) {
-        // Names, bounds and library/interface metadata must remain the target's.
-        if(p.getName() != "Value" || router->isExcludeFromSnapshot()) return false;
+    if(!ofxOceanodeMorph::isControl(model,p,&owner)) return false;
+    // A source's own Input routers carry the mixer's inputs.
+    if(root) if(auto* router = dynamic_cast<abstractRouter*>(&model)) {
         const auto& name = router->getNameParam().get();
-        if(owner.getParameterGroup().contains(name)) {
-            auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(&owner.getParameterGroup().get(name));
-            if(pin && pin->hasInConnection()) return false;
-        }
-        if(root) for(const auto& r : graph.revision->contract().routers)
+        for(const auto& r : graph.revision->contract().routers)
             if(r.direction == "Input" && r.name == name) return false;
     }
     return true;
@@ -2128,4 +2107,50 @@ std::string MacroMixerSource::globalPortal(const ofJson& definition) {
         }
     }
     return {};
+}
+
+// ofxOceanodeMorph.h: the rules shared with other state interpolators.
+bool ofxOceanodeMorph::isControl(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p, ofxOceanodeNodeMacro* owner) {
+    // Portal receivers have no incoming cable, but their values are driven by
+    // the shared Portal service. Writing saved values here would feed them back
+    // into their senders and compete with the graph's actual controls.
+    if(model.nodeName().rfind("Portal ",0)==0) return false;
+    // A node's own window is opened from MacroMixer, never by a source's save.
+    if(auto* toggle=model.getWindowToggle()) if(toggle->getName()==p.getName()) return false;
+    // A saved key owned by the node's sound morph must never also receive
+    // generic parameter interpolation, even when it has a published port.
+    const auto keys=model.morphKeys();
+    if(std::find(keys.blended.begin(),keys.blended.end(),p.getEscapedName())!=keys.blended.end()) return false;
+    const auto hint=model.morphHint(p);
+    if(hint==ofxOceanodeNodeModel::MorphHint::Skip || hint==ofxOceanodeNodeModel::MorphHint::Structural) return false;
+    // OF reports numeric vectors as non-serializable; the native Oceanode
+    // preset saver explicitly handles them, so use that same exception here.
+    const bool numericVector=p.valueType()==typeid(std::vector<float>).name() || p.valueType()==typeid(std::vector<int>).name();
+    if(p.hasInConnection() || (!p.isSerializable() && !numericVector) || p.isReadOnly() ||
+       (p.getFlags() & (ofxOceanodeParameterFlags_DisableInConnection |
+                        ofxOceanodeParameterFlags_DisableSavePreset | ofxOceanodeParameterFlags_ReadOnly))) return false;
+    if(auto* router = dynamic_cast<abstractRouter*>(&model)) {
+        // Names, bounds and library/interface metadata must remain the target's.
+        if(p.getName() != "Value" || router->isExcludeFromSnapshot()) return false;
+        const auto& name = router->getNameParam().get();
+        if(owner && owner->getParameterGroup().contains(name)) {
+            auto* pin = dynamic_cast<ofxOceanodeAbstractParameter*>(&owner->getParameterGroup().get(name));
+            if(pin && pin->hasInConnection()) return false;
+        }
+    }
+    return true;
+}
+ofxOceanodeMorph::Motion ofxOceanodeMorph::motionOf(ofxOceanodeNodeModel& model, ofxOceanodeAbstractParameter& p) {
+    Motion motion;
+    const auto value = captureMorph(p);
+    const auto hint = model.morphHint(p);
+    motion.discrete = !value || value->discrete || hint == ofxOceanodeNodeModel::MorphHint::Switch;
+    motion.logarithmic = hint == ofxOceanodeNodeModel::MorphHint::Log;
+    return motion;
+}
+std::vector<float> ofxOceanodeMorph::blend(const std::vector<float>& a, const std::vector<float>& b, float t, bool logarithmic) {
+    return morphControl(a,b,t,false,MacroMixerMorphPolicies{},logarithmic,1.f);
+}
+std::vector<int> ofxOceanodeMorph::blend(const std::vector<int>& a, const std::vector<int>& b, float t) {
+    return morphControl(a,b,t,false,MacroMixerMorphPolicies{},false,1.f);
 }
