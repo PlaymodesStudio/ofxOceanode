@@ -15,6 +15,7 @@
 #include "ofxOceanodeColors.h"
 #include "ofxOceanodeMenu.h"
 #include "ofxOceanodeMenuLabel.h"
+#include "ofxOceanodeTransportWidgets.h"
 #include "ofxOceanodeShared.h"
 #include "ofxOceanodeTimeController.h"
 #include "imgui_internal.h"
@@ -650,8 +651,10 @@ void ofxOceanode::drawMenuBar(){
     const float suffixWidth = controls->menuBarStatusSuffixWidth();
     const float rightGap = 8.0f;
     // Match the actual control widths and SameLine spacing so the FPS slot
-    // stays close to the meters without changing the right edge alignment.
-    const float transportWidth = 144.0f + spacing + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
+    // stays close to the meters without changing the right edge alignment:
+    // BPM, position readout, play, stop.
+    const float transportWidth = 72.0f + ofxOceanodeTransportWidgets::positionReadoutWidth + spacing
+                               + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
     const float contentWidth = transportWidth + fpsWidth + spacing
                              + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
                              + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
@@ -807,12 +810,43 @@ void ofxOceanode::drawMenuBar(){
             height - ImGui::GetTextLineHeight()));
         ImGui::SetCursorPosY(textOffset);
 
-		// TRANSPORT: BPM, beat position, play/pause, stop (the shared global transport)
+		// TRANSPORT: BPM, position readout, play/pause, stop (the shared global transport)
 		if(auto transport = container->getTransport()) {
 			const auto transportState = transport->getState();
 			const bool externalClock = transport->hasExternalClock();
 			const bool bpmLocked = externalClock || (container->getAutomationExtension() && container->getAutomationExtension()->isBpmAutomationEnabled());
+			const char* bpmLockedTip = externalClock ? "Tempo from the external clock" : "Tempo from the tempo lane";
+			const char* clockLockedTip = "Following an external clock";
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2,0));
+
+			// Square icon buttons drawn like the timeline toolbar's.
+			const float iconSize = ImGui::GetFrameHeight();
+			enum { PlayIcon, PauseIcon, StopIcon };
+			auto transportButton = [&](const char* id, int icon, bool on, bool enabled, const char* tooltip) {
+				const ImVec2 pos = ImGui::GetCursorScreenPos();
+				const ImVec2 size(iconSize + 2.0f, iconSize);
+				const bool pressed = ImGui::InvisibleButton(id, size) && enabled;
+				const bool hovered = ImGui::IsItemHovered() && enabled;
+				const bool held = ImGui::IsItemActive() && enabled;
+				auto* dl = ImGui::GetWindowDrawList();
+				const ImU32 accent = IM_COL32(90, 205, 125, 255);
+				const ImU32 bg = on ? accent : ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
+				dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, 3.0f);
+				const ImU32 col = !enabled ? IM_COL32(120, 120, 120, 160) : on ? IM_COL32(15, 18, 24, 255) : IM_COL32(225, 228, 235, 255);
+				const ImVec2 c(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
+				const float s = size.y * 0.52f;
+				if(icon == PlayIcon) {
+					dl->AddTriangleFilled(ImVec2(c.x - s * 0.35f, c.y - s * 0.45f), ImVec2(c.x - s * 0.35f, c.y + s * 0.45f),
+					                      ImVec2(c.x + s * 0.45f, c.y), col);
+				} else if(icon == PauseIcon) {
+					dl->AddRectFilled(ImVec2(c.x - s * 0.38f, c.y - s * 0.42f), ImVec2(c.x - s * 0.1f, c.y + s * 0.42f), col, 1.0f);
+					dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
+				} else if(icon == StopIcon) {
+					dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
+				}
+				if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltip);
+				return pressed;
+			};
 
 			float globalBpm = transportState.bpm;
 			ImGui::SetNextItemWidth(72);
@@ -821,52 +855,34 @@ void ofxOceanode::drawMenuBar(){
 				container->setBpm(globalBpm);
 			ImGui::EndDisabled();
 			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-				ImGui::SetTooltip(externalClock ? "Tempo from the external clock" :
-				                  bpmLocked ? "Tempo from the tempo lane" : "Tempo (drag, or double-click to type)");
+				ImGui::SetTooltip("%s", bpmLocked ? bpmLockedTip : "Tempo (drag, or double-click to type)");
 
+			// Position: the timeline toolbar's readout (bar . beat . sixteenth and
+			// song time). Dragging it sideways moves the transport, as the beat
+			// field it replaces did.
 			ImGui::SameLine();
-			double globalBeat = transportState.beatPosition;
-			const double beatMin = 0.0;
-			ImGui::SetNextItemWidth(72);
-			ImGui::BeginDisabled(externalClock);
-			if(ImGui::DragScalar("##globalBeat", ImGuiDataType_Double, &globalBeat, 0.05f, &beatMin, nullptr, "%.2f") && !externalClock)
-				transport->seekToBeat(std::max(0.0, globalBeat));
-			ImGui::EndDisabled();
-			if(ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-				ImGui::SetTooltip(externalClock ? "Following an external clock" : "Transport position in beats (drag, or double-click to type)");
+			ofxOceanodeTransportWidgets::positionReadout("##globalPosition", transportState.beatPosition,
+			                                             transportState.beatsPerBar, transportState.seconds,
+			                                             transportState.isPlaying, iconSize);
+			const bool positionHovered = ImGui::IsItemHovered();
+			const bool positionDragged = ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
+			if(!externalClock) {
+				if(positionHovered || positionDragged) ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+				const float dragged = ImGui::GetIO().MouseDelta.x;
+				if(positionDragged && dragged != 0.0f)
+					transport->seekToBeat(std::max(0.0, transportState.beatPosition + dragged * 0.05));
+			}
+			if(positionHovered && !positionDragged)
+				ImGui::SetTooltip("Bar . beat . sixteenth    song time\nBeat %.3f\n%s", std::max(0.0, transportState.beatPosition),
+				                  externalClock ? clockLockedTip : "Drag to move the transport");
 
-			// Square icon buttons drawn like the timeline toolbar's.
-			const float iconSize = ImGui::GetFrameHeight();
-			auto transportButton = [&](const char* id, int icon, bool on, const char* tooltip) {
-				ImGui::SameLine(0.0f, 2.0f);
-				const ImVec2 pos = ImGui::GetCursorScreenPos();
-				const ImVec2 size(iconSize + 2.0f, iconSize);
-				const bool pressed = ImGui::InvisibleButton(id, size) && !externalClock;
-				const bool hovered = ImGui::IsItemHovered() && !externalClock;
-				const bool held = ImGui::IsItemActive() && !externalClock;
-				auto* dl = ImGui::GetWindowDrawList();
-				const ImU32 accent = IM_COL32(90, 205, 125, 255);
-				const ImU32 bg = on ? accent : ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
-				dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), bg, 3.0f);
-				const ImU32 col = externalClock ? IM_COL32(120, 120, 120, 160) : on ? IM_COL32(15, 18, 24, 255) : IM_COL32(225, 228, 235, 255);
-				const ImVec2 c(pos.x + size.x * 0.5f, pos.y + size.y * 0.5f);
-				const float s = size.y * 0.52f;
-				if(icon == 0) { // play
-					dl->AddTriangleFilled(ImVec2(c.x - s * 0.35f, c.y - s * 0.45f), ImVec2(c.x - s * 0.35f, c.y + s * 0.45f),
-					                      ImVec2(c.x + s * 0.45f, c.y), col);
-				} else if(icon == 1) { // pause
-					dl->AddRectFilled(ImVec2(c.x - s * 0.38f, c.y - s * 0.42f), ImVec2(c.x - s * 0.1f, c.y + s * 0.42f), col, 1.0f);
-					dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
-				} else { // stop
-					dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
-				}
-				if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", externalClock ? "Following an external clock" : tooltip);
-				return pressed;
-			};
-			if(transportButton("##globalPlay", transportState.isPlaying ? 1 : 0, transportState.isPlaying,
-			                   transportState.isPlaying ? "Pause" : "Play"))
+			ImGui::SameLine(0.0f, 2.0f);
+			if(transportButton("##globalPlay", transportState.isPlaying ? PauseIcon : PlayIcon, transportState.isPlaying, !externalClock,
+			                   externalClock ? clockLockedTip : transportState.isPlaying ? "Pause" : "Play"))
 				transport->setIsPlaying(!transportState.isPlaying);
-			if(transportButton("##globalStop", 2, false, "Stop (back to the start)"))
+			ImGui::SameLine(0.0f, 2.0f);
+			if(transportButton("##globalStop", StopIcon, false, !externalClock,
+			                   externalClock ? clockLockedTip : "Stop (back to the start)"))
 				transport->stop();
 
 			ImGui::PopStyleVar();
