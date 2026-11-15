@@ -652,9 +652,9 @@ void ofxOceanode::drawMenuBar(){
     const float rightGap = 8.0f;
     // Match the actual control widths and SameLine spacing so the FPS slot
     // stays close to the meters without changing the right edge alignment:
-    // BPM, position readout, play, stop.
+    // tap, BPM, position readout, play, stop.
     const float transportWidth = 72.0f + ofxOceanodeTransportWidgets::positionReadoutWidth + spacing
-                               + 2.0f * (ImGui::GetFrameHeight() + 2.0f) + 4.0f;
+                               + 3.0f * (ImGui::GetFrameHeight() + 2.0f) + 6.0f;
     const float contentWidth = transportWidth + fpsWidth + spacing
                              + (statusWidth > 0 ? spacing + statusWidth : 0.0f)
                              + (suffixWidth > 0 ? spacing + suffixWidth : 0.0f);
@@ -810,7 +810,7 @@ void ofxOceanode::drawMenuBar(){
             height - ImGui::GetTextLineHeight()));
         ImGui::SetCursorPosY(textOffset);
 
-		// TRANSPORT: BPM, position readout, play/pause, stop (the shared global transport)
+		// TRANSPORT: tap tempo, BPM, position readout, play/pause, stop (the shared global transport)
 		if(auto transport = container->getTransport()) {
 			const auto transportState = transport->getState();
 			const bool externalClock = transport->hasExternalClock();
@@ -821,7 +821,7 @@ void ofxOceanode::drawMenuBar(){
 
 			// Square icon buttons drawn like the timeline toolbar's.
 			const float iconSize = ImGui::GetFrameHeight();
-			enum { PlayIcon, PauseIcon, StopIcon };
+			enum { PlayIcon, PauseIcon, StopIcon, TapIcon };
 			auto transportButton = [&](const char* id, int icon, bool on, bool enabled, const char* tooltip) {
 				const ImVec2 pos = ImGui::GetCursorScreenPos();
 				const ImVec2 size(iconSize + 2.0f, iconSize);
@@ -843,11 +843,22 @@ void ofxOceanode::drawMenuBar(){
 					dl->AddRectFilled(ImVec2(c.x + s * 0.1f, c.y - s * 0.42f), ImVec2(c.x + s * 0.38f, c.y + s * 0.42f), col, 1.0f);
 				} else if(icon == StopIcon) {
 					dl->AddRectFilled(ImVec2(c.x - s * 0.36f, c.y - s * 0.36f), ImVec2(c.x + s * 0.36f, c.y + s * 0.36f), col, 1.5f);
+				} else {
+					ofxOceanodeTransportWidgets::drawTapIcon(dl, c, s, col);
 				}
 				if(ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tooltip);
 				return pressed;
 			};
 
+			// Tap tempo, as on the timeline toolbar.
+			if(transportButton("##globalTap", TapIcon, false, !bpmLocked,
+			                   bpmLocked ? bpmLockedTip : "Tap tempo: tap on the beat")){
+				float tappedBpm = transportState.bpm;
+				if(ofxOceanodeTransportWidgets::tapTempo(globalTapTimes, ofGetElapsedTimef(), tappedBpm))
+					container->setBpm(tappedBpm);
+			}
+
+			ImGui::SameLine(0.0f, 2.0f);
 			float globalBpm = transportState.bpm;
 			ImGui::SetNextItemWidth(72);
 			ImGui::BeginDisabled(bpmLocked);

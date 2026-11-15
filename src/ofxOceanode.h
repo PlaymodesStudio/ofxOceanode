@@ -234,6 +234,7 @@ private:
     void drawMenuBar();
     bool showMetrics = false;
     bool openQuickTips = false;
+    std::vector<double> globalTapTimes; // the menu bar's tap tempo (seconds)
 
     
     ofParameter<int> oscReceiverPort;

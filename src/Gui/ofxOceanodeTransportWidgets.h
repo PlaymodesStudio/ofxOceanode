@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <vector>
 
 // Transport widgets drawn the same wherever a transport is shown: the host
 // menu bar here, and the timeline toolbar in ofxOceanodeTimeline.
@@ -40,6 +41,27 @@ inline void positionReadout(const char* id, double beat, double beatsPerBar, dou
                 isPlaying ? IM_COL32(120, 235, 160, 255) : IM_COL32(230, 232, 238, 255), positionText);
     const float timeWidth = ImGui::CalcTextSize(timeText).x;
     dl->AddText(ImVec2(pos.x + size.x - timeWidth - 8.0f, textY), IM_COL32(150, 155, 165, 255), timeText);
+}
+
+// The tap tempo icon: a ring around a dot. `s` is the icon size (about half
+// the button's height), as for the other transport icons.
+inline void drawTapIcon(ImDrawList* dl, ImVec2 center, float s, ImU32 col){
+    dl->AddCircle(center, s * 0.4f, col, 16, 1.6f);
+    dl->AddCircleFilled(center, s * 0.16f, col);
+}
+
+// Tap tempo: call on each tap, with the time in seconds. The tempo is the
+// average of the last taps (8 at most); a pause of 2 s starts over. True
+// when it set `bpm` (from the second tap on).
+inline bool tapTempo(std::vector<double>& tapTimes, double now, float& bpm){
+    if(!tapTimes.empty() && now - tapTimes.back() > 2.0) tapTimes.clear();
+    tapTimes.push_back(now);
+    if(tapTimes.size() > 8) tapTimes.erase(tapTimes.begin());
+    if(tapTimes.size() < 2) return false;
+    const double interval = (tapTimes.back() - tapTimes.front()) / (tapTimes.size() - 1);
+    if(interval <= 0.0) return false;
+    bpm = std::clamp(static_cast<float>(60.0 / interval), 20.0f, 400.0f);
+    return true;
 }
 
 }
