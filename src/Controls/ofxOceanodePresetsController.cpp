@@ -408,8 +408,10 @@ void ofxOceanodePresetsController::drawPopups(){
     }
 
     ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    if(ImGui::BeginPopupModal("Save Preset As", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
+    // Keep the form centered as replacement choices change its size or the
+    // app window is resized, rather than only positioning it when opened.
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    if(ImGui::BeginPopupModal("Save Preset As", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove)){
         if(ImGui::IsWindowAppearing()){
             ImGui::SetKeyboardFocusHere();
             presetNameCursorPending = true;
@@ -443,7 +445,7 @@ void ofxOceanodePresetsController::drawPopups(){
                    std::find(targets.begin(), targets.end(), current->second) != targets.end())
                     saveAsReplacementIndex = current->second;
             }
-            ImGui::TextWrapped("A preset with this name already exists. Saving will replace it after confirmation.");
+            ImGui::TextWrapped("A preset with this name already exists. Replace will overwrite it with your current changes.");
             auto labelFor = [&](int index){ return ofToString(index + 1) + " | " + presetNameAt(index, banks[saveAsBank]); };
             if(targets.size() > 1 && ImGui::BeginCombo("Replace preset", labelFor(saveAsReplacementIndex).c_str())){
                 for(int index : targets){
@@ -454,48 +456,23 @@ void ofxOceanodePresetsController::drawPopups(){
             }
         }else saveAsReplacementIndex = -1;
         ImGui::BeginDisabled(!canSave);
-        const bool save = ImGui::Button(replacing ? "Replace..." : "Save");
+        const bool save = ImGui::Button(replacing ? "Replace" : "Save");
         ImGui::EndDisabled();
         bool closeSaveAs = false;
         if(canSave && (enter || save)){
             if(replacing){
-                replacementBank = banks[saveAsBank];
-                replacementIndex = saveAsReplacementIndex;
-                replacementName = presetNameAt(replacementIndex, replacementBank);
-                ImGui::OpenPopup("Replace Preset?");
+                // The selected destination and Replace action are already
+                // explicit here. Continue through the normal macro review.
+                beginSavePreset("", banks[saveAsBank], saveAsReplacementIndex);
             }else{
                 beginSavePreset(requestedName, banks[saveAsBank], -1);
-                closeSaveAs = true;
             }
-        }
-        ImGui::SameLine();
-        if(ImGui::Button("Cancel") || (ImGui::IsKeyPressed(ImGuiKey_Escape) && !ImGui::IsPopupOpen("Replace Preset?"))){
-            cancelPendingAction();
             closeSaveAs = true;
         }
-        ImGui::SetNextWindowViewport(ImGui::GetMainViewport()->ID);
-        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        if(ImGui::BeginPopupModal("Replace Preset?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
-            ImGui::Text("Bank: %s", replacementBank.c_str());
-            ImGui::Text("Preset: %d | %s", replacementIndex + 1, replacementName.c_str());
-            ImGui::TextUnformatted("Replace this preset with your current changes?");
-            ImGui::TextUnformatted("The existing preset will be overwritten. Global macros are reviewed next.");
-            const bool targetUnchanged = !replacementName.empty() &&
-                presetNameAt(replacementIndex, replacementBank) == replacementName;
-            if(!targetUnchanged) ImGui::TextWrapped("The preset list changed. Cancel and select the destination again.");
-            ImGui::BeginDisabled(!targetUnchanged);
-            const bool replace = ImGui::Button("Replace");
-            ImGui::EndDisabled();
-            if(replace && targetUnchanged){
-                // The normal Save pipeline owns macro review, write failures,
-                // saved-state tracking and the pending destructive action.
-                beginSavePreset("", replacementBank, replacementIndex);
-                ImGui::CloseCurrentPopup();
-                closeSaveAs = true;
-            }
-            ImGui::SameLine();
-            if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
+        ImGui::SameLine();
+        if(ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)){
+            cancelPendingAction();
+            closeSaveAs = true;
         }
         if(closeSaveAs) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();

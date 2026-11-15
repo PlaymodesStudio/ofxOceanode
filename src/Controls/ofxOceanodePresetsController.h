@@ -67,8 +67,6 @@ private:
     string lastPresetName;
     int saveAsBank = 0;
     int saveAsReplacementIndex = -1;
-    string replacementBank, replacementName;
-    int replacementIndex = -1;
     string deleteBankName;
     string deletePresetName;
     int deletePresetIndex = -1;
