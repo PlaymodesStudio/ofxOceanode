@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Verify Global Pitch's scale table: quantization, Shift (degrees, carried across octaves) and Scale Root.
+"""Verify Global Pitch's scale table: quantization, Shift (degrees, carried across octaves) and Scale Root,
+and its scopes: the state a destination follows by canvas (All Levels, This Level, This Level + Submacros).
 
 Compiles the real ofxOceanodeGlobalPitch.h against a stub node model, so no
 openFrameworks app is needed. Requires Python 3 and clang++.
@@ -19,10 +20,12 @@ STUB_MODEL = r'''
 #include <vector>
 class ofxOceanodeNodeModel {
 public:
-    std::string getParents() const { return "Canvas"; }
+    std::string parents = "Canvas";
+    std::string getParents() const { return parents; }
     std::string nodeName() const { return "Stub"; }
     int getNumIdentifier() const { return 1; }
 };
+inline unsigned long long ofGetElapsedTimeMicros() { return 0; }
 inline std::string ofToString(int v) { std::ostringstream s; s << v; return s.str(); }
 inline std::vector<std::string> ofSplitString(const std::string& text, const std::string& sep, bool, bool) {
     std::vector<std::string> out;
@@ -110,8 +113,47 @@ int main() {
     GP::setLowScale({}, 0, false);
     near(GP::apply(&node, 61), 61);
     GP::setShift(0);
-    GP::unfollow(&node);
-    std::cout << "Global Pitch passed: nearest degree, Shift across octaves, Scale Root, low scale, bypass, transpose order.\n";
+
+    // Scopes. Canvas paths: a macro is not inside another whose name it starts with.
+    assert(GP::within("Macro 1 / Macro 2", "Macro 1") && GP::within("Macro 1", "Canvas"));
+    assert(!GP::within("Macro 10", "Macro 1") && !GP::within("Canvas", "Macro 1"));
+    ofxOceanodeNodeModel inMacro, inSub, inOther;
+    inMacro.parents = "Macro 1"; inSub.parents = "Macro 1 / Macro 2"; inOther.parents = "Macro 10";
+    for(auto* n : {&inMacro, &inSub, &inOther}) GP::follow(n, true, {});
+    GP::setTranspose(1);                                   // All Levels
+    for(auto* n : {&node, &inMacro, &inSub, &inOther}) near(GP::apply(n, 60), 61);
+    const int tree = GP::claim(GP::Subtree, "Macro 1");    // Macro 1 and its submacros
+    assert(tree > 0 && GP::claim(GP::Subtree, "Macro 1") == tree && GP::holders(tree) == 2);
+    GP::release(tree);
+    GP::setTranspose(5, tree);
+    near(GP::apply(&node, 60), 61); near(GP::apply(&inOther, 60), 61);
+    near(GP::apply(&inMacro, 60), 65); near(GP::apply(&inSub, 60), 65);
+    const int level = GP::claim(GP::Level, "Macro 1");     // nearer than the Subtree, for its own canvas only
+    assert(level > 0 && level != tree);
+    GP::setTranspose(7, level);
+    near(GP::apply(&inMacro, 60), 67); near(GP::apply(&inSub, 60), 65);
+    const int sub = GP::claim(GP::Level, "Macro 1 / Macro 2");
+    GP::setTranspose(-2, sub);
+    near(GP::apply(&inSub, 60), 58);
+    // Ticks live in the state a destination follows, under a name relative to its canvas.
+    GP::setFollows(&inSub, GP::Transpose, false);
+    near(GP::apply(&inSub, 60), 60);
+    assert(GP::overridesText(GP::Transpose, sub) == "Stub 1=0\n" && GP::overridesText(GP::Transpose).empty());
+    // A scope leaving: its destinations fall back to the next one out.
+    GP::release(sub);
+    near(GP::apply(&inSub, 60), 65);
+    GP::release(level);
+    near(GP::apply(&inMacro, 60), 65);
+    GP::release(tree);
+    near(GP::apply(&inMacro, 60), 61);
+    // Every slot taken: -1, and nothing changes.
+    std::vector<int> taken;
+    for(int i = 0; i < GP::MaxScopes + 2; i++) taken.push_back(GP::claim(GP::Level, "Macro " + ofToString(20 + i)));
+    assert(taken[GP::MaxScopes - 2] > 0 && taken[GP::MaxScopes - 1] == -1);
+    for(int slot : taken) GP::release(slot);
+    GP::setTranspose(0);
+    for(auto* n : {&node, &inMacro, &inSub, &inOther}) GP::unfollow(n);
+    std::cout << "Global Pitch passed: nearest degree, Shift across octaves, Scale Root, low scale, bypass, transpose order, scopes.\n";
 }
 '''
 
