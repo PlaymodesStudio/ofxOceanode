@@ -2982,9 +2982,18 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         const float connectionWidth = ofxOceanodeShared::getConnectionWidth();
         // A selected node's wires are drawn wider so they stand out.
         constexpr float selectedConnectionExtraWidth = 0.5f;
-        constexpr float nodeAttachmentTension = 1.5f;
         oceanodeConnectionDrawing::Renderer connectionRenderer(draw_list);
         using ConnectionStyle = oceanodeConnectionDrawing::Style;
+        // Established wires and drag previews use identical curve geometry.
+        auto drawConnection = [&](const glm::vec2& source, const glm::vec2& sink,
+                                  ImU32 color, float width, ConnectionStyle style){
+            constexpr float nodeAttachmentTension = 1.5f;
+            const float tension = ofMap(glm::distance(source, sink), 0, 1500 * zoomLevel,
+                                        25 * zoomLevel, 400 * zoomLevel) * nodeAttachmentTension;
+            const glm::vec2 controlPoint(tension, 0);
+            connectionRenderer.bezier(source, source + controlPoint, sink - controlPoint, sink,
+                                      color, width, style, zoomLevel);
+        };
         std::unordered_map<string, ConnectionStyle> connectionStyles;
         // Resolve registered type names once per type per frame, without addon dependencies.
         auto parameterConnectionStyle = [&](ofxOceanodeAbstractParameter* parameter){
@@ -3021,9 +3030,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         auto* sinkGui = container->getGuiFromModel(sinkParameter.getNodeModel());
                         glm::vec2 p1 = getSourceConnectionPositionFromParameter(sourceParameter, sourceGui) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                         glm::vec2 p2 = getSinkConnectionPositionFromParameter(sinkParameter, sinkGui) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
-                        glm::vec2  controlPoint(0,0);
-                        controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-                        const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
                         const bool selectedConnection = (sourceGui && sourceGui->getSelected()) ||
                                                         (sinkGui && sinkGui->getSelected());
                         ImU32 lineColor = connectionLineColor;
@@ -3036,11 +3042,9 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             sourceColor.z *= 0.5f;
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
-                        connectionRenderer.bezier(p1, p1 + nodeControlPoint, p2 - nodeControlPoint, p2,
-                                                  lineColor,
-                                                  selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth,
-                                                  connectionStyle(&sourceParameter, &sinkParameter),
-                                                  zoomLevel);
+                        drawConnection(p1, p2, lineColor,
+                                       selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth,
+                                       connectionStyle(&sourceParameter, &sinkParameter));
                     }
                 }
 
@@ -3057,9 +3061,6 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 auto* sinkGui = container->getGuiFromModel(tempSinkParameter->getNodeModel());
                 p2 = getSinkConnectionPositionFromParameter(*tempSinkParameter, sinkGui) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
             }
-            glm::vec2  controlPoint(0,0);
-            controlPoint.x = ofMap(glm::distance(p1,p2), 0, 1500 * zoomLevel, 25 * zoomLevel, 400 * zoomLevel);
-            const glm::vec2 nodeControlPoint = controlPoint * nodeAttachmentTension;
             ImVec4 c;
             if(connectionIsDoable){
                 c = OceanodeColors::ConnectionDraggingReachable;
@@ -3073,12 +3074,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 c.z = darkLine.z;
                 c.w *= darkLine.w;
             }
-            connectionRenderer.bezier(p1,
-                                      p1 + (tempSourceParameter != nullptr ? nodeControlPoint : controlPoint),
-                                      p2 - (tempSourceParameter != nullptr ? controlPoint : nodeControlPoint),
-                                      p2, OceanodeColors::U32(c), connectionWidth,
-                                      connectionStyle(tempSourceParameter, tempSinkParameter),
-                                      zoomLevel);
+            drawConnection(p1, p2, OceanodeColors::U32(c), connectionWidth,
+                           connectionStyle(tempSourceParameter, tempSinkParameter));
         }
         
         draw_list->ChannelsMerge();
