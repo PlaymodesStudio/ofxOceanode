@@ -1330,9 +1330,25 @@ ofJson currentComments(ofxOceanodeContainer& container){
         entry["Color"]["R"] = c.color.r;
         entry["Color"]["G"] = c.color.g;
         entry["Color"]["B"] = c.color.b;
+        entry["Color"]["A"] = c.color.a;
         entry["TextColor"]["R"] = c.textColor.r;
         entry["TextColor"]["G"] = c.textColor.g;
         entry["TextColor"]["B"] = c.textColor.b;
+        entry["TextColor"]["A"] = c.textColor.a;
+    }
+    return json;
+}
+
+ofJson normalizedSavedComments(ofJson json){
+    // Older saves omitted alpha; the comment loader restores it as opaque.
+    if(json.is_object() && json.contains("Comments") && json["Comments"].is_array()){
+        for(auto& entry : json["Comments"]){
+            for(const auto* key : {"Color", "TextColor"}){
+                if(entry.contains(key) && entry[key].is_object() && !entry[key].contains("A")){
+                    entry[key]["A"] = 1.0f;
+                }
+            }
+        }
     }
     return json;
 }
@@ -1376,10 +1392,6 @@ ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& bas
                     {"customGui", normalizedCustomGuis(container.getCustomGuisJsonForReview())},
                     {"customGuiSnapshots", normalizedCustomGuiSnapshots(container.getCustomGuiSnapshotsJsonForReview())},
                     {"midi", container.getMidiBindingsJsonForReview()}};
-    for(size_t i = 0; i < container.getComments().size(); ++i){
-        state["comments"]["Comments"][i]["Color"]["A"] = container.getComments()[i].color.a;
-        state["comments"]["Comments"][i]["TextColor"]["A"] = container.getComments()[i].textColor.a;
-    }
     if(container.isTransportOwner()){
         auto* automation = container.getAutomationExtension();
         if(automation) state["automation"] = automation->presetEditState();
@@ -1587,7 +1599,7 @@ void compareContainer(ofxOceanodeContainer& container, const std::string& savedF
     }
 
     compareJson(changes, location, "Comments", "Comments",
-                readJson(savedFolder + "/comments.json"), currentComments(container));
+                normalizedSavedComments(readJson(savedFolder + "/comments.json")), currentComments(container));
     compareJson(changes, location, "Custom GUI", "Panels",
                 normalizedCustomGuis(readJson(savedFolder + "/custom_guis.json")),
                 normalizedCustomGuis(container.getCustomGuisJsonForReview()));
