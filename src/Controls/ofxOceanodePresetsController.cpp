@@ -1358,6 +1358,16 @@ ofJson normalizedCustomGuiSnapshots(ofJson json){
     return banks;
 }
 
+// The AI assistant's model choice (ofxOceanodeAIAssistant::save) is a tool
+// preference stored with the node, at the top level or nested, not an edit.
+ofJson withoutAssistantModel(ofJson json){
+    if(json.is_object()){
+        json.erase("requesty_model");
+        for(auto& child : json) child = withoutAssistantModel(std::move(child));
+    }
+    return json;
+}
+
 // Capture a baseline after loading/saving. Live clocks and unedited parameter
 // values reuse that baseline; authored content is compared only on a request.
 ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& baseline){
@@ -1394,6 +1404,7 @@ ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& bas
         node->saveInspectorParametersToJson(inspector);
         ofJson modelData;
         model.presetSave(modelData);
+        modelData = withoutAssistantModel(std::move(modelData));
         if(modelData.is_object()){
             for(auto it = modelData.begin(); it != modelData.end();){
                 if(parameters.contains(it.key()) || inspector.contains(it.key()) ||
@@ -1461,6 +1472,7 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
 
     ofJson modelData;
     model.presetSave(modelData);
+    modelData = withoutAssistantModel(std::move(modelData));
     if(modelData.is_object()){
         for(auto it = modelData.begin(); it != modelData.end(); ++it){
             if(parameters.contains(it.key()) || inspector.contains(it.key())) continue;
@@ -1469,7 +1481,7 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
             // placement, or the current snapshot choice, not macro edits.
             if(it.key() == "AllCurvesOutput" || it.key() == "ExtWindowRect" ||
                it.key() == "ExtWindowMode" || it.key() == "SelectedSnapshotSlot") continue;
-            compareJson(changes, location, label, it.key(), field(saved, it.key()), it.value());
+            compareJson(changes, location, label, it.key(), withoutAssistantModel(field(saved, it.key())), it.value());
         }
     }
 
