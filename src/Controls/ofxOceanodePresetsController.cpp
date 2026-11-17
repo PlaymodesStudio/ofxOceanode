@@ -883,6 +883,14 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         if(ImGui::IsItemHovered()) ImGui::SetTooltip("Save this instance as a new global macro and use it here.\n%s and its other instances stay unchanged.", review.name.c_str());
         ImGui::SameLine();
         const bool skipMacro = ImGui::Button("Skip this macro");
+        // Skip this macro and every one still to review, without more dialogs.
+        bool skipAll = false;
+        if(request.reviewIndex + 1 < request.reviews.size()){
+            ImGui::SameLine();
+            skipAll = ImGui::Button("Skip all");
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Skip this macro and the %d still to review.\nMacros already chosen to save are kept.",
+                                                         static_cast<int>(request.reviews.size() - request.reviewIndex - 1));
+        }
         ImGui::SameLine();
         const bool cancel = ImGui::Button("Cancel preset save") || ImGui::IsKeyPressed(ImGuiKey_Escape);
         if(cancel){
@@ -900,6 +908,12 @@ void ofxOceanodePresetsController::drawGlobalMacroSaveReview(){
         }
         if(saveMacro || skipMacro){
             request.saveChoices[request.reviewIndex] = saveMacro ? MacroSaveChoice::Save : MacroSaveChoice::Skip;
+            decided = true;
+        }
+        if(skipAll){
+            for(size_t i = request.reviewIndex; i < request.reviews.size(); ++i)
+                request.saveChoices[i] = MacroSaveChoice::Skip;
+            request.reviewIndex = request.reviews.size() - 1;
             decided = true;
         }
     }
