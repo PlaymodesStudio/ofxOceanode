@@ -155,7 +155,11 @@ public:
     void loadPreset_loadComments(string presetFolderPath);
     
     
-    bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs);
+    // A pasted node, with the escaped type and the number it was copied with.
+    struct ClipboardPastedNode { ofxOceanodeNode* node = nullptr; std::string type; int number = 0; };
+    // pasted: filled with every node made, in the order they were made.
+    bool loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs,
+                                            std::vector<ClipboardPastedNode>* pasted = nullptr);
     void saveClipboardModulesAndConnections(vector<ofxOceanodeNode*> nodes, glm::vec2 referencePosition);
     
     bool savePersistent();
@@ -350,7 +354,9 @@ public:
     const ofxOceanodeContainer* getContainerForCanvasID(const std::string& canvasID) const;
     bool copySelectedModulesWithConnections();
     bool cutSelectedModulesWithConnections();
-    bool pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs);
+    // offerAutomation: a paste asked by the user, after which the automation
+    // extension may offer to paste the automation copied with the nodes.
+    bool pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs, bool offerAutomation = false);
     bool deleteSelectedModules();
 
     // Canvas gestures only; runtime parameter updates never enter history.

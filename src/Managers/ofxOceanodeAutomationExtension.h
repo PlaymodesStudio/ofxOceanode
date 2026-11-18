@@ -6,6 +6,7 @@
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeNodeModel;
+class ofxOceanodeNode;
 class ofxOceanodeContainer;
 
 // Optional root-owned automation service. Macro containers forward to their host.
@@ -81,4 +82,15 @@ public:
     virtual std::vector<CanvasTimeline> canvasTimelines(const ofxOceanodeContainer& /*canvas*/) { return {}; }
     virtual void setTimelineWindowOpen(const std::string& /*canvas*/, const std::string& /*timeline*/, bool /*open*/,
                                        const std::string& /*label*/) {}
+    // Nodes of `canvas` were copied to the clipboard folder (copy, cut,
+    // duplicate, encapsulate): the automation driving them can be kept
+    // beside them there.
+    virtual void saveClipboard(ofxOceanodeContainer& /*canvas*/, const std::vector<ofxOceanodeNode*>& /*nodes*/,
+                               const std::string& /*folder*/) {}
+    // The user pasted the clipboard folder's nodes into `canvas` (never a
+    // duplicate or an encapsulation). oldToNew: every pasted parameter's
+    // timeline path as it was, relative to the canvas it was copied from ->
+    // its path now, absolute. The extension may offer to paste what it kept.
+    virtual void clipboardPasted(ofxOceanodeContainer& /*canvas*/, const std::string& /*folder*/,
+                                 const std::map<std::string, std::string>& /*oldToNew*/) {}
 };

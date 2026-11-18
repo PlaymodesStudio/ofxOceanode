@@ -36,7 +36,8 @@
 #endif
 
 
-bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs){
+bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referencePosition, bool allowOutsideInputs,
+                                                              std::vector<ClipboardPastedNode>* pasted){
     of::filesystem::path presetFolderPath = of::filesystem::current_path() / "clipboardPreset";
     of::filesystem::path tempLoadFolderPath = presetFolderPath / "tempLoad";
     ofLog()<<"Load Clipboard Preset";
@@ -65,6 +66,7 @@ bool ofxOceanodeContainer::loadClipboardModulesAndConnections(glm::vec2 referenc
             node->getNodeGui().setPosition(glm::vec2(nodeId.value()[0], nodeId.value()[1]) + referencePosition);
             node->getNodeGui().setSelected(true);
             newCreatedNodes.push_back(node);
+            if(pasted != nullptr) pasted->push_back({node, escapedNodeName, ofToInt(nodeId.key())});
             int newNodeId = node->getNodeModel().getNumIdentifier();
             moduleConverter[escapedNodeName][ofToInt(nodeId.key())] = newNodeId;
             if(!ofSaveJson(tempLoadFolderPath / (escapedNodeName + "_" + ofToString(newNodeId) + ".json"), tempJson)) return false;
@@ -214,6 +216,10 @@ void ofxOceanodeContainer::saveClipboardModulesAndConnections(vector<ofxOceanode
     }
     json["NumComments"] = commentIndex;
     ofSavePrettyJson(presetFolderPath / "comments.json", json);
+
+    // The automation driving the copied nodes travels beside them.
+    if(auto* automation = getAutomationExtension(); automation != nullptr && !nodes.empty())
+        automation->saveClipboard(*this, nodes, presetFolderPath.string());
 }
 
 bool ofxOceanodeContainer::copySelectedModulesWithConnections(){
@@ -254,9 +260,20 @@ bool ofxOceanodeContainer::cutSelectedModulesWithConnections(){
     return true;
 }
 
-bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs){
+bool ofxOceanodeContainer::pasteModulesAndConnectionsInPosition(glm::vec2 position, bool allowOutsideInputs, bool offerAutomation){
+    auto* automation = offerAutomation ? getAutomationExtension() : nullptr;
+    std::vector<ClipboardPastedNode> pasted;
     ofxOceanodeShared::startedLoadingPreset(ofxOceanodePresetLoadType_ClipboardPaste);
-    bool b_sucess = loadClipboardModulesAndConnections(position, allowOutsideInputs);
+    bool b_sucess = loadClipboardModulesAndConnections(position, allowOutsideInputs, automation != nullptr ? &pasted : nullptr);
     ofxOceanodeShared::finishedLoadingPreset();
+    if(b_sucess && automation != nullptr && !pasted.empty()){
+        // Where each pasted parameter was on the canvas it was copied from,
+        // and where it is now (a macro: everything inside it too).
+        std::map<std::string, std::string> pastedTimelinePaths;
+        for(const auto& entry : pasted)
+            collectMovedTimelinePaths(*entry.node, entry.type + "_" + ofToString(entry.number) + "/",
+                                      timelineMacroCanvas(std::string(), entry.number), pastedTimelinePaths);
+        automation->clipboardPasted(*this, (of::filesystem::current_path() / "clipboardPreset").string(), pastedTimelinePaths);
+    }
     return b_sucess;
 }

@@ -3185,7 +3185,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                     deselectAllNodes();
                     glm::vec2 pastePosition = screenToWorld(glm::vec2(ImGui::GetMousePos()));
                     if(snap_to_grid) pastePosition = snapToGrid(pastePosition);
-                    container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift);
+                    container->pasteModulesAndConnectionsInPosition(pastePosition, ImGui::GetIO().KeyShift, true);
                 }else if(ImGui::IsKeyPressed(ImGuiKey_X)){
                     container->cutSelectedModulesWithConnections();
                 }else if(ImGui::IsKeyPressed(ImGuiKey_D)){
