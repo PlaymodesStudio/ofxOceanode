@@ -3014,7 +3014,19 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         };
 
         std::unordered_set<ofxOceanodeAbstractConnection*> drawnConnections;
-        
+        // With colored connections on, a selected node's wires get a black outline.
+        // They are drawn after every other wire so nothing covers the outline.
+        constexpr float highlightOutlineExtraWidth = 5.0f; // Total, so 3 px on each side.
+        constexpr ImU32 highlightOutlineColor = IM_COL32(0, 0, 0, 192);
+        struct HighlightedConnection {
+            glm::vec2 source;
+            glm::vec2 sink;
+            ImU32 color;
+            float width;
+            ConnectionStyle style;
+        };
+        std::vector<HighlightedConnection> highlightedConnections;
+
         for(auto nodePair : nodesVisibleInThisFrame)
         {
             if(deletedIds.count(nodePair.first) != 0) continue;
@@ -3042,13 +3054,26 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                             sourceColor.z *= 0.5f;
                             lineColor = OceanodeColors::U32(sourceColor);
                         }
-                        drawConnection(p1, p2, lineColor,
-                                       selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth,
-                                       connectionStyle(&sourceParameter, &sinkParameter));
+                        const float lineWidth = selectedConnection ? connectionWidth + selectedConnectionExtraWidth : connectionWidth;
+                        const ConnectionStyle lineStyle = connectionStyle(&sourceParameter, &sinkParameter);
+                        if(colorConnections && selectedConnection){
+                            highlightedConnections.push_back({p1, p2, lineColor, lineWidth, lineStyle});
+                        }else{
+                            drawConnection(p1, p2, lineColor, lineWidth, lineStyle);
+                        }
                     }
                 }
 
             }
+        }
+        // Every outline goes down before any colored wire, so wires leaving the
+        // same pin share one outline instead of cutting into each other.
+        for(const auto& wire : highlightedConnections){
+            drawConnection(wire.source, wire.sink, highlightOutlineColor,
+                           wire.width + highlightOutlineExtraWidth, ConnectionStyle::Solid);
+        }
+        for(const auto& wire : highlightedConnections){
+            drawConnection(wire.source, wire.sink, wire.color, wire.width, wire.style);
         }
         if(tempSourceParameter != nullptr || tempSinkParameter != nullptr){
             glm::vec2 p1, p2;
