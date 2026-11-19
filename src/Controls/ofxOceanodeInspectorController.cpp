@@ -91,6 +91,18 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
     }
 }
 
+// The macro whose canvas is the given container, searched below root.
+static ofxOceanodeNodeMacro* macroOwningContainer(ofxOceanodeContainer* root, ofxOceanodeContainer* target){
+    if(root == nullptr || target == nullptr || root == target) return nullptr;
+    for(auto* candidate : root->getAllModules()){
+        auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&candidate->getNodeModel());
+        if(macro == nullptr || macro->getContainer() == nullptr) continue;
+        if(macro->getContainer().get() == target) return macro;
+        if(auto* nested = macroOwningContainer(macro->getContainer().get(), target)) return nested;
+    }
+    return nullptr;
+}
+
 void ofxOceanodeInspectorController::draw(){
     // The selection registry covers every nested macro, including hidden
     // canvases, without walking the graph each frame.
@@ -182,6 +194,44 @@ void ofxOceanodeInspectorController::draw(){
             editedPortal = nullptr;
             ImGui::PopStyleVar();
             owningContainer->replacePortalTypeInAllInstances(portal, typeName);
+            return;
+        }
+    }
+
+    if(auto* router = dynamic_cast<abstractRouter*>(&node->getNodeModel())){
+        static abstractRouter* editedRouter = nullptr;
+        static string typeName;
+        if(editedRouter != router){
+            editedRouter = router;
+            typeName = router->nodeName();
+        }
+        auto* hostContainer = router->getHostContainer() != nullptr ? router->getHostContainer() : owningContainer;
+
+        ImGui::SeparatorText("Router type");
+        vector<string> routerTypes;
+        for(const auto& model : hostContainer->getRegistry()->getRegisteredModels()){
+            if(model.first.rfind("Router ", 0) == 0) routerTypes.push_back(model.first);
+        }
+        std::sort(routerTypes.begin(), routerTypes.end());
+        const string typeLabel = typeName.rfind("Router ", 0) == 0 ? typeName.substr(7) : typeName;
+        if(ImGui::BeginCombo("Type##router_type", typeLabel.c_str())){
+            for(const auto& candidate : routerTypes){
+                const bool selected = candidate == typeName;
+                if(ImGui::Selectable(candidate.substr(7).c_str(), selected)) typeName = candidate;
+                if(selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if(typeName == router->nodeName()) ImGui::BeginDisabled();
+        const bool replaceType = ImGui::Button("Apply##router_type");
+        if(typeName == router->nodeName()) ImGui::EndDisabled();
+        if(replaceType){
+            editedRouter = nullptr;
+            ImGui::PopStyleVar();
+            // Inside a macro the router is also a pin of it, with cables of its own.
+            if(auto* macro = macroOwningContainer(container.get(), hostContainer)) macro->replaceRouterType(node, typeName);
+            else hostContainer->replaceRouterType(node, typeName);
             return;
         }
     }

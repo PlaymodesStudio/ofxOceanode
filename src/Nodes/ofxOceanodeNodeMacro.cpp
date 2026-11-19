@@ -601,6 +601,97 @@ void ofxOceanodeNodeMacro::processRouterNode(ofxOceanodeNode* node){
 	}
 }
 
+bool ofxOceanodeNodeMacro::replaceRouterType(ofxOceanodeNode* routerNode, const string& newTypeName){
+	auto* oldRouter = routerNode == nullptr ? nullptr : dynamic_cast<abstractRouter*>(&routerNode->getNodeModel());
+	if(oldRouter == nullptr || container == nullptr || oldRouter->nodeName() == newTypeName ||
+	   newTypeName.rfind("Router ", 0) != 0)
+		return false;
+	const string name = oldRouter->getNameParam().get();
+
+	// The pin goes with the old router, so its cables are taken off first and
+	// put back on the pin of the new one.
+	struct Cable {
+		ofxOceanodeAbstractParameter* other;
+		bool incoming;
+		bool persistent;
+	};
+	vector<Cable> cables;
+	auto pinNamed = [this](const string& pinName) -> ofxOceanodeAbstractParameter* {
+		return getParameterGroup().contains(pinName)
+			? dynamic_cast<ofxOceanodeAbstractParameter*>(&getParameterGroup().get(pinName)) : nullptr;
+	};
+	auto connectPin = [this](ofxOceanodeAbstractParameter& pin, const vector<Cable>& saved){
+		bool all = true;
+		for(const auto& cable : saved){
+			auto* connection = cable.incoming
+				? parentContainer->createConnection(*cable.other, pin)
+				: parentContainer->createConnection(pin, *cable.other);
+			if(connection != nullptr) connection->setIsPersistent(cable.persistent);
+			else all = false;
+		}
+		return all;
+	};
+	if(auto* oldPin = parentContainer != nullptr ? pinNamed(name) : nullptr){
+		for(auto* connection : oldPin->getInConnections())
+			cables.push_back({&connection->getSourceParameter(), true, connection->getIsPersistent()});
+		for(auto* connection : oldPin->getOutConnections())
+			cables.push_back({&connection->getSinkParameter(), false, connection->getIsPersistent()});
+		oldPin->removeAllConnections();
+	}
+
+	auto& order = sortOrder.getOrder();
+	const auto oldEntry = std::find(order.begin(), order.end(), name);
+	const bool wasOrdered = oldEntry != order.end();
+	const size_t orderIndex = oldEntry - order.begin();
+
+	// The pin is replaced outside any canvas edit: the parent's undo steps would
+	// replay against a pin that no longer exists.
+	if(parentContainer != nullptr) parentContainer->clearCanvasHistory();
+
+	auto* newNode = container->replaceRouterType(routerNode, newTypeName);
+	if(newNode == nullptr){
+		if(auto* oldPin = pinNamed(name); oldPin != nullptr && !cables.empty()) connectPin(*oldPin, cables);
+		return false;
+	}
+	const string newName = static_cast<abstractRouter&>(newNode->getNodeModel()).getNameParam().get();
+
+	// The new router was appended to the pin order: move it back.
+	if(wasOrdered){
+		auto entry = std::find(order.begin(), order.end(), newName);
+		if(entry != order.end()){
+			order.erase(entry);
+			order.insert(order.begin() + std::min(orderIndex, order.size()), newName);
+		}
+	}
+	syncParameterGroupToSortOrder();
+
+	// Snapshot values stored for the old type cannot be applied to the new one,
+	// except between int and float (and their vectors), which are stored alike.
+	auto* newValue = newNode->getParameters().contains("Value")
+		? dynamic_cast<ofxOceanodeAbstractParameter*>(&newNode->getParameters().get("Value")) : nullptr;
+	const string newValueType = newValue != nullptr ? newValue->valueType() : string(typeid(void).name());
+	auto storedAlike = [](const string& a, const string& b){
+		auto scalar = [](const string& t){ return t == typeid(float).name() || t == typeid(int).name(); };
+		auto list = [](const string& t){ return t == typeid(vector<float>).name() || t == typeid(vector<int>).name(); };
+		return (scalar(a) && scalar(b)) || (list(a) && list(b));
+	};
+	for(auto& slot : snapshotSystem.getSnapshots()){
+		auto stored = slot.second.routerValues.find(newName);
+		if(stored == slot.second.routerValues.end() || stored->second.type == newValueType) continue;
+		if(storedAlike(stored->second.type, newValueType)) stored->second.type = newValueType;
+		else slot.second.routerValues.erase(stored);
+	}
+
+	bool success = true;
+	if(!cables.empty()){
+		auto* newPin = pinNamed(newName);
+		success = newPin != nullptr && connectPin(*newPin, cables);
+	}
+	// Input or output is read from the inner cables, which are back only now.
+	routerManager.updateAllConnections(container.get());
+	return success;
+}
+
 bool ofxOceanodeNodeMacro::loadMacroSource(const std::string& folder) {
     if(!ofFile::doesFileExist(folder + "/modules.json")) return false;
     presetManager.clearNextPresetPath();

@@ -173,6 +173,9 @@ public:
 	const string& getCurrentMacroPath() const { return presetManager.getCurrentMacroPath(); }
 	const std::deque<string>& getCurrentMacroCategory() const { return presetManager.getCurrentCategory(); }
 	const std::vector<string>& getRouterSortOrder() const { return sortOrder.getOrder(); }
+	// Swaps one of this macro's routers for another type. The pin keeps its
+	// name, its place and the outer cables the new type still accepts.
+	bool replaceRouterType(ofxOceanodeNode* routerNode, const string& newTypeName);
 	bool wasRouterOrderUserEdited() const { return routerOrderUserEdited; }
 	void markMacroReferenceUserEdited();
 	bool wasMacroReferenceUserEdited() const;
