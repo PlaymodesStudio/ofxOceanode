@@ -11,6 +11,10 @@
 //                  This Level + Submacros. A destination takes the nearest
 //                  one: its own level's This Level, then This Level +
 //                  Submacros of its level or the nearest parent, then All Levels
+//    Shortest Path Transpose, Shift and Low Shift take the nearest octave: a
+//                  transposed note never moves more than a tritone (+7 plays
+//                  as -5), a shifted one more than half its scale (7 degrees:
+//                  +5 plays as -2). No effect on Transpose under Mod 12
 //    Scale Root    (C .. B) the pitch class both scales' degrees count from
 //    Scale         the notes move to the nearest degree (semitones 0-11 above
 //                  Scale Root: E Phrygian dominant is root E, 0,1,4,5,7,8,10)
@@ -59,7 +63,8 @@ public:
                       "(the axis between its minor and major third), then Transpose (semitones) is added (Mod 12: wrapped "
                       "into the note's own octave from Base Note), then each "
                       "voice's own random Detune (within +-cents). Glide: seconds a change takes to reach the sounding "
-                      "notes (synths; a MIDI note takes the value of its instant). The inspector chooses which destinations follow each one. "
+                      "notes (synths; a MIDI note takes the value of its instant). Shortest Path: Transpose, Shift and Low Shift take "
+                      "the nearest octave, so a note never moves more than a tritone (+7 plays as -5) or half its scale. The inspector chooses which destinations follow each one. "
                       "Scope: All Levels reaches the main canvas and every macro, This Level only the canvas the node sits in, "
                       "This Level + Submacros that canvas and the macros inside it; a destination follows the nearest Global Pitch reaching it.";
     }
@@ -72,8 +77,10 @@ public:
     void setup() override {
         slot = ofxOceanodeGlobalPitch::claim(ofxOceanodeGlobalPitch::All, getParents());
         joined = 0;
+        addSeparator("General");
         addParameterDropdown(scope, "Scope", 0, {"All Levels", "This Level", "This Level + Submacros"},
                              ofxOceanodeParameterFlags_DisableInConnection | ofxOceanodeParameterFlags_DisableOutConnection);
+        addParameter(shortest.set("Shortest Path", ofxOceanodeGlobalPitch::shortestPath(slot)));
         const auto& current = ofxOceanodeGlobalPitch::scale(slot);
         addSeparator("Scale");
         addParameterDropdown(root, "Scale Root", ofxOceanodeGlobalPitch::scaleRoot(slot), noteNames());
@@ -121,6 +128,7 @@ public:
         listeners.push(transpose.newListener([this](float&){ sendTranspose(); }));
         listeners.push(wrap.newListener([this](bool&){ sendWrap(); }));
         listeners.push(wrapBase.newListener([this](int&){ sendWrap(); }));
+        listeners.push(shortest.newListener([this](bool&){ sendShortest(); }));
         listeners.push(detune.newListener([this](float&){ sendDetune(); }));
         listeners.push(glide.newListener([this](float&){ sendGlide(); }));
         // Its values reach the state on the first update, not here: a preset
@@ -161,6 +169,7 @@ public:
     void presetRecallAfterSettingParameters(ofJson& json) override {
         if(!json.contains(root.getEscapedName())) root = 0;   // from before Scale Root: degrees counted from C
         if(!json.contains(negative.getEscapedName())) negative = false;   // from before Negative Harmony
+        if(!json.contains(shortest.getEscapedName())) shortest = false;   // from before Shortest Path
         if(json.contains(lowBypass.getEscapedName())) return;
         ofParameter<bool> earlier;
         earlier.set("Low Scale Bypass", false);
@@ -298,6 +307,7 @@ private:
         transpose = ofxOceanodeGlobalPitch::transpose(slot);
         wrap = ofxOceanodeGlobalPitch::transposeWraps(slot);
         wrapBase = ofxOceanodeGlobalPitch::transposeBase(slot);
+        shortest = ofxOceanodeGlobalPitch::shortestPath(slot);
         detune = ofxOceanodeGlobalPitch::detune(slot);
         glide = ofxOceanodeGlobalPitch::glide(slot);
         for(int f = 0; f < ofxOceanodeGlobalPitch::NumFeatures; f++) destinations[f] = ofxOceanodeGlobalPitch::overridesText(feature(f), slot);
@@ -312,6 +322,7 @@ private:
         sendNegative();
         sendTranspose();
         sendWrap();
+        sendShortest();
         sendDetune();
         sendGlide();
     }
@@ -372,6 +383,12 @@ private:
         ofxOceanodeGlobalPitch::setTransposeWrap(on, base, slot);
         share([on, base](globalPitch* n){ n->wrap = on; n->wrapBase = base; });
     }
+    void sendShortest() {
+        if(!live()) return;
+        const bool on = shortest.get();
+        ofxOceanodeGlobalPitch::setShortestPath(on, slot);
+        share([on](globalPitch* n){ n->shortest = on; });
+    }
     void sendDetune() {
         if(!live()) return;
         const float v = detune.get();
@@ -400,7 +417,7 @@ private:
     ofParameter<float> split;
     ofParameter<bool> bypass, lowBypass;
     ofParameter<float> transpose, detune, glide;
-    ofParameter<bool> wrap, negative;
+    ofParameter<bool> wrap, negative, shortest;
     ofParameter<int> root, wrapBase, negativeKey, shift, lowShift;
     std::array<ofParameter<std::string>, ofxOceanodeGlobalPitch::NumFeatures> destinations;
     ofEventListeners listeners;

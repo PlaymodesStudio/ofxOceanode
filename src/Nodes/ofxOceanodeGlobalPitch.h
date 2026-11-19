@@ -6,7 +6,7 @@
 //  (degrees 0-11 above a root, and a low scale for the notes below a split
 //  note), a shift along each scale (degrees, carried into the next octave), one
 //  transpose (semitones, optionally wrapped into each note's
-//  octave), one random detune per voice (cents) and a glide time, for every
+//  octave), a shortest-path option for the transpose and the shifts, one random detune per voice (cents) and a glide time, for every
 //  node in the patch that plays or shows pitches. Each feature has its own list of destinations,
 //  ticked in the Global Pitch node's inspector.
 //
@@ -147,7 +147,7 @@ public:
         if(s.scale == degrees && s.scaleOn == on) return;
         s.scale = degrees;
         s.scaleOn = on;
-        s.offsets = offsetsFor(degrees, s.shift, s.root);
+        s.offsets = offsetsOf(s, false);
         valuesChanged(Scale, slot);
     }
     // root: the pitch class (0 = C .. 11 = B) the degrees of both scales count
@@ -159,8 +159,8 @@ public:
         root = ((root % 12) + 12) % 12;
         if(s.root == root) return;
         s.root = root;
-        s.offsets = offsetsFor(s.scale, s.shift, root);
-        s.lowOffsets = offsetsFor(s.lowScale, s.lowShift, root);
+        s.offsets = offsetsOf(s, false);
+        s.lowOffsets = offsetsOf(s, true);
         valuesChanged(Scale, slot);
     }
     // shift: the quantized note moves this many degrees along its scale (negative
@@ -172,7 +172,7 @@ public:
         auto& s = state(slot);
         if(s.shift == degrees) return;
         s.shift = degrees;
-        s.offsets = offsetsFor(s.scale, degrees, s.root);
+        s.offsets = offsetsOf(s, false);
         valuesChanged(Scale, slot);
     }
     static int lowShift(int slot = 0) { return state(slot).lowShift; }
@@ -181,7 +181,7 @@ public:
         auto& s = state(slot);
         if(s.lowShift == degrees) return;
         s.lowShift = degrees;
-        s.lowOffsets = offsetsFor(s.lowScale, degrees, s.root);
+        s.lowOffsets = offsetsOf(s, true);
         valuesChanged(Scale, slot);
     }
     // each pitch class's offset to its nearest degree of the scale / low scale, shifted
@@ -201,7 +201,7 @@ public:
         s.lowScale = degrees;
         s.split = split;
         s.lowOn = on;
-        s.lowOffsets = offsetsFor(degrees, s.lowShift, s.root);
+        s.lowOffsets = offsetsOf(s, true);
         valuesChanged(Scale, slot);
     }
     // negative harmony (Jacob Collier): after the scale, each note is mirrored
@@ -247,6 +247,35 @@ public:
         s.wrapBase = base;
         valuesChanged(Transpose, slot);
     }
+    // shortest path: each note takes the octave of its transposed note nearest
+    // to where it was, so it never moves more than a tritone (+7 plays as -5).
+    // The nearest octave is the same for every note: the transpose folded into
+    // -6 .. +6 (a tritone goes down). Stateless: the distance is from the note
+    // as played, not from the last transpose. Nothing changes under modulo 12,
+    // which already gives the same note for a transpose an octave away.
+    // The shifts fold the same way, into half their scale's degrees each side
+    // (7 degrees: +5 plays as -2), every note by the same number of degrees,
+    // so a melody keeps its contour.
+    static bool shortestPath(int slot = 0) { return state(slot).shortest; }
+    static void setShortestPath(bool on, int slot = 0) {
+        if(!valid(slot) || state(slot).shortest == on) return;
+        auto& s = state(slot);
+        s.shortest = on;
+        s.offsets = offsetsOf(s, false);
+        s.lowOffsets = offsetsOf(s, true);
+        valuesChanged(Transpose, slot);
+        valuesChanged(Scale, slot);
+    }
+    static float folded(float t) { return t - 12.0f * std::floor(t / 12.0f + 0.5f); }   // into -6 .. +6 (+6 excluded)
+    // a shift along a scale of n degrees, into -n/2 .. +n/2 (half of an even scale goes down)
+    static int foldedShift(int shift, int n) {
+        return n <= 0 ? shift : shift - n * int(std::floor(float(shift) / n + 0.5f));
+    }
+    // the transpose the notes get (and the buses carry): folded when shortest path is on
+    static float effectiveTranspose(int slot = 0) {
+        const auto& s = state(slot);
+        return s.shortest ? folded(s.transpose) : s.transpose;
+    }
     static float detune(int slot = 0) { return state(slot).detune; }
     // cents: each voice's offset is a fixed random within +-cents
     static void setDetune(float cents, int slot = 0) {
@@ -280,7 +309,7 @@ public:
             Lag& l = s.lag;
             const double dt = std::max(0.0, now - l.lastTime);
             l.lastTime = now;
-            const float transposeTarget = s.transpose;
+            const float transposeTarget = effectiveTranspose(slot);
             const std::array<float, 12> offsetsTarget = lagTarget(false, slot), lowTarget = lagTarget(true, slot);
             bool transposeMoved = false, scaleMoved = false;
             auto move = [&](float& value, float target) {
@@ -499,6 +528,7 @@ private:
         float detune = 0.0f;
         bool wrap = false;
         int wrapBase = 0;
+        bool shortest = false;
         int shift = 0;
         int lowShift = 0;
         int root = 0;
@@ -529,10 +559,17 @@ private:
         for(auto& o : s.overrides) if(!o.empty()) return false;
         return true;
     }
+    // a state's offset table for one side: its scale, its shift (folded when shortest path is on), the root
+    static std::array<float, 12> offsetsOf(const State& s, bool low) {
+        const auto& degrees = low ? s.lowScale : s.scale;
+        int shift = low ? s.lowShift : s.shift;
+        if(s.shortest) shift = foldedShift(shift, (int)distinctDegrees(degrees).size());
+        return offsetsFor(degrees, shift, s.root);
+    }
     static std::array<float, 12> lagTarget(bool low, int slot) { return harmonyOn(low, slot) ? harmonyOffsets(low, slot) : std::array<float, 12>{}; }
     static void snapLag(int slot) {
         Lag& l = state(slot).lag;
-        l.transpose = state(slot).transpose;
+        l.transpose = effectiveTranspose(slot);
         l.offsets = lagTarget(false, slot);
         l.lowOffsets = lagTarget(true, slot);
     }
