@@ -147,6 +147,7 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         inputPositions.resize(getParameters().size());
         outputPositions.resize(getParameters().size());
     }
+    if(foldedRows.size() != getParameters().size()) foldedRows.assign(getParameters().size(), 0);
     auto isHeaderToggle = [&](ofxOceanodeAbstractParameter& parameter){
         return !isTransparent && (parameter.getFlags() & ofxOceanodeParameterFlags_HeaderToggle) &&
                parameter.valueType() == typeid(bool).name();
@@ -277,10 +278,22 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
         
         if(renderGui){
 
-        
+        // A labelled separator starts a group running to the next separator.
+        // Its rows are skipped while the group is folded, and their pins sit
+        // on the separator row so their cables stay visible.
+        bool groupFolded = false;
+        float groupHeaderY = 0.0f;
         for(int i=0 ; i<getParameters().size(); i++){
             ofxOceanodeAbstractParameter &absParam = static_cast<ofxOceanodeAbstractParameter&>(getParameters().get(i));
+            foldedRows[i] = 0;
             if(isHeaderToggle(absParam)) continue;
+            if(absParam.valueType() == typeid(std::function<void()>).name() && absParam.getName().rfind("SEPARATOR:|", 0) == 0){
+                groupFolded = false; // Set again when the separator row is drawn.
+            }else if(groupFolded){
+                foldedRows[i] = 1;
+                inputPositions[i] = outputPositions[i] = glm::vec2(0, groupHeaderY);
+                continue;
+            }
             if(!node.isParameterShownInGui(absParam)){
                 // Hidden in the Inspector: no row, and no pin (it has no cables).
                 inputPositions[i] = outputPositions[i] = glm::vec2(0, ImGui::GetCursorScreenPos().y);
@@ -334,23 +347,31 @@ bool ofxOceanodeNodeGui::constructGui(float nodeWidthText, float nodeWidthWidget
                         // not guiRect.width which is in world-space coordinates.
                         float w = nodeWidthText + nodeWidthWidget;
                         float scale = zoomLevel;
-                        
-                        // Draw the text
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(color.r/255.0f, color.g/255.0f, color.b/255.0f, color.a/255.0f));
-                        ImGui::TextUnformatted(label.c_str());
-                        ImGui::PopStyleColor();
-                        
-                        // Get the size of the rendered text
-                        ImVec2 textSize = ImGui::CalcTextSize(label.c_str());
-                        
-                        // Draw a semi-transparent rectangle behind/below the text (25% opacity)
-                        ImU32 bgCol = IM_COL32(color.r, color.g, color.b, color.a * 0.15f);
-                        ImGui::GetWindowDrawList()->AddRectFilled(
-                            ImVec2(p.x, p.y),
-                            ImVec2(p.x + w, p.y + textSize.y),
-                            bgCol
-                        );
-                        
+                        const float h = ImGui::GetTextLineHeight();
+
+                        // The whole bar toggles the group's fold.
+                        bool folded = node.isGroupFolded(label);
+                        if(ImGui::InvisibleButton("##groupFold", ImVec2(w, h))){
+                            folded = !folded;
+                            node.setGroupFolded(label, folded);
+                        }
+                        const bool hovered = ImGui::IsItemHovered();
+                        groupFolded = folded;
+                        groupHeaderY = p.y + h * 0.5f;
+
+                        // Semi-transparent bar, a little stronger while hovered.
+                        auto* drawList = ImGui::GetWindowDrawList();
+                        drawList->AddRectFilled(ImVec2(p.x, p.y), ImVec2(p.x + w, p.y + h),
+                                                IM_COL32(color.r, color.g, color.b, color.a * (hovered ? 0.3f : 0.15f)));
+
+                        // Fold arrow: right when folded, down when open.
+                        const ImU32 textCol = IM_COL32(color.r, color.g, color.b, color.a);
+                        const float a = h * 0.25f;
+                        const ImVec2 c(p.x + h * 0.5f, p.y + h * 0.5f);
+                        if(folded) drawList->AddTriangleFilled(ImVec2(c.x - a * 0.75f, c.y - a), ImVec2(c.x - a * 0.75f, c.y + a), ImVec2(c.x + a, c.y), textCol);
+                        else       drawList->AddTriangleFilled(ImVec2(c.x - a, c.y - a * 0.75f), ImVec2(c.x + a, c.y - a * 0.75f), ImVec2(c.x, c.y + a), textCol);
+                        drawList->AddText(ImVec2(p.x + h, p.y), textCol, label.c_str());
+
                         ImGui::Dummy(ImVec2(0, 2.0f * scale));
                     }
                 }else{
@@ -1000,6 +1021,12 @@ glm::vec2 ofxOceanodeNodeGui::getSourceConnectionPositionFromParameter(ofxOceano
 
 glm::vec2 ofxOceanodeNodeGui::getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter){
     return inputPositions[getParameters().getPosition(parameter.getName())];
+}
+
+bool ofxOceanodeNodeGui::isParameterFolded(ofxOceanodeAbstractParameter& parameter){
+    if(!expanded || !getParameters().contains(parameter.getName())) return false;
+    const size_t index = getParameters().getPosition(parameter.getName());
+    return index < foldedRows.size() && foldedRows[index];
 }
 
 bool ofxOceanodeNodeGui::hasConnectionPosition(ofxOceanodeAbstractParameter& parameter){

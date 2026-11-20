@@ -1788,6 +1788,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
                         if(!node->isParameterShownInGui(*param)) continue;
+                        if(nodeGui.isParameterFolded(*param)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableInConnection)){
                             auto bulletPosition = nodeGui.getSinkConnectionPositionFromParameter(*param) - glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
@@ -1853,6 +1854,7 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                         auto param = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(absParam);
                         if(!nodeGui.getExpanded() && !(param->getFlags() & ofxOceanodeParameterFlags_HeaderToggle)) continue;
                         if(!node->isParameterShownInGui(*param)) continue;
+                        if(nodeGui.isParameterFolded(*param)) continue;
                         if(!(param->getFlags() & ofxOceanodeParameterFlags_DisableOutConnection)){
                             auto bulletPosition = nodeGui.getSourceConnectionPositionFromParameter(*param) + glm::vec2(NODE_WINDOW_PADDING.x * zoomLevel, 0);
                             auto mouseToBulletDistance = glm::distance(glm::vec2(ImGui::GetMousePos()), bulletPosition);
