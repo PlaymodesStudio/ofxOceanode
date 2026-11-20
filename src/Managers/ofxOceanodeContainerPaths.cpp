@@ -266,7 +266,19 @@ const ofxOceanodeContainer* ofxOceanodeContainer::getContainerForCanvasID(const 
 
 bool ofxOceanodeContainer::showParameterInCanvas(ofxOceanodeAbstractParameter& parameter)
 {
-    auto* node = getNodeFromParameter(parameter);
+    // Its node, from the canvas the parameter lives in. This container's own
+    // map only holds the nodes of its canvas: one inside a macro is not in
+    // it (and a node of the same name out here would be shown in its place).
+    ofxOceanodeContainer* owner = this;
+    if(auto* model = parameter.getNodeModel()) {
+        const std::string canvasID = model->getParents();
+        const bool here = canvasID == getCanvasID() || (isRootCanvasID(canvasID) && isRootCanvasID(getCanvasID()));
+        if(!here)
+            if(auto* root = ofxOceanodeShared::getRootContainer())
+                owner = isRootCanvasID(canvasID) ? root : root->getContainerForCanvasID(canvasID);
+    }
+    auto* node = owner->getNodeFromParameter(parameter);
+    if(node == nullptr && owner != this) node = getNodeFromParameter(parameter);
     if(node == nullptr) return false;
     return showNodeInCanvas(*node);
 }
