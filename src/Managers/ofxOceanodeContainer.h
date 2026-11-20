@@ -97,6 +97,10 @@ public:
     ofxOceanodeNode* createNodeFromName(string name, int identifier = -1, bool isPersistent = false);
     ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier = -1, bool isPersistent = false, string additionalInfo = "");
     bool replacePortalTypeInAllInstances(abstractPortal* portal, const string& newTypeName);
+    // Swaps a router for one of another type, keeping its name, place and the
+    // cables the new type still accepts. Returns the new node. Inside a macro
+    // use ofxOceanodeNodeMacro::replaceRouterType, which also keeps the pin.
+    ofxOceanodeNode* replaceRouterType(ofxOceanodeNode* routerNode, const string& newTypeName);
 	ofxOceanodeNode& createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, string additionalInfo){return createNode(std::move(nodeModel), -1, false, additionalInfo);}
     
     template<typename ModelType>

@@ -464,6 +464,109 @@ bool ofxOceanodeContainer::replacePortalTypeInAllInstances(abstractPortal* porta
     return success;
 }
 
+ofxOceanodeNode* ofxOceanodeContainer::replaceRouterType(ofxOceanodeNode* oldNode, const string& newTypeName){
+    auto* oldRouter = oldNode == nullptr ? nullptr : dynamic_cast<abstractRouter*>(&oldNode->getNodeModel());
+    if(oldRouter == nullptr || oldRouter->nodeName() == newTypeName || newTypeName.rfind("Router ", 0) != 0 ||
+       registry->getRegisteredModels().count(newTypeName) == 0)
+        return nullptr;
+
+    // router<void> calls its port "Val"; every other router calls it "Value".
+    auto slotOf = [](const string& parameterName){ return parameterName == "Val" ? string("Value") : parameterName; };
+    auto findSlot = [](ofxOceanodeNode& node, const string& slot) -> ofxOceanodeAbstractParameter* {
+        auto& parameters = node.getParameters();
+        const string parameterName = parameters.contains(slot) ? slot : (slot == "Value" && parameters.contains("Val") ? "Val" : "");
+        return parameterName.empty() ? nullptr : dynamic_cast<ofxOceanodeAbstractParameter*>(&parameters.get(parameterName));
+    };
+    // Numbers move between f, i, v_f and v_i routers; other values start at the new type's default.
+    auto readNumbers = [](ofxOceanodeAbstractParameter& parameter, vector<float>& numbers){
+        const string type = parameter.valueType();
+        if(type == typeid(float).name()) numbers = {parameter.cast<float>().getParameter().get()};
+        else if(type == typeid(int).name()) numbers = {(float)parameter.cast<int>().getParameter().get()};
+        else if(type == typeid(vector<float>).name()) numbers = parameter.cast<vector<float>>().getParameter().get();
+        else if(type == typeid(vector<int>).name()){
+            numbers.clear();
+            for(int number : parameter.cast<vector<int>>().getParameter().get()) numbers.push_back(number);
+        }
+        else return false;
+        return !numbers.empty();
+    };
+    auto writeNumbers = [](ofxOceanodeAbstractParameter& parameter, const vector<float>& numbers){
+        const string type = parameter.valueType();
+        if(type == typeid(float).name()) parameter.cast<float>().getParameter() = numbers[0];
+        else if(type == typeid(int).name()) parameter.cast<int>().getParameter() = (int)std::round(numbers[0]);
+        else if(type == typeid(vector<float>).name()) parameter.cast<vector<float>>().getParameter() = numbers;
+        else if(type == typeid(vector<int>).name()){
+            vector<int> rounded;
+            for(float number : numbers) rounded.push_back((int)std::round(number));
+            parameter.cast<vector<int>>().getParameter() = rounded;
+        }
+    };
+
+    struct ConnectionInfo {
+        string slot;
+        ofxOceanodeAbstractParameter* other;
+        bool incoming;
+        bool persistent;
+    };
+    vector<ConnectionInfo> savedConnections;
+    map<string, vector<float>> savedNumbers;
+    for(auto& rawParameter : oldNode->getParameters()){
+        auto parameter = dynamic_pointer_cast<ofxOceanodeAbstractParameter>(rawParameter);
+        if(parameter == nullptr) continue;
+        const string slot = slotOf(parameter->getName());
+        for(auto* connection : parameter->getInConnections())
+            savedConnections.push_back({slot, &connection->getSourceParameter(), true, connection->getIsPersistent()});
+        for(auto* connection : parameter->getOutConnections())
+            savedConnections.push_back({slot, &connection->getSinkParameter(), false, connection->getIsPersistent()});
+        vector<float> numbers;
+        if((slot == "Value" || slot == "Min" || slot == "Max") && readNumbers(*parameter, numbers)) savedNumbers[slot] = numbers;
+    }
+
+    const glm::vec2 position = oldNode->getNodeGui().getPosition();
+    const bool expanded = oldNode->getNodeGui().getExpanded();
+    const bool visible = oldNode->getNodeGui().getVisibility();
+    const bool selected = oldNode->getNodeGui().getSelected();
+    const bool active = oldNode->getActive();
+    const bool persistent = oldNode->getIsPersistent();
+    const string name = oldRouter->getNameParam().get();
+    const bool snapshotExclude = oldRouter->isExcludeFromSnapshot();
+
+    auto* newNode = createNodeFromName(newTypeName, -1, persistent);
+    auto* newRouter = newNode == nullptr ? nullptr : dynamic_cast<abstractRouter*>(&newNode->getNodeModel());
+    if(newRouter == nullptr){
+        if(newNode != nullptr) newNode->deleteSelf();
+        return nullptr;
+    }
+    newNode->getNodeGui().setPosition(position);
+    newNode->getNodeGui().setExpanded(expanded);
+    newNode->getNodeGui().setVisibility(visible);
+    newNode->getNodeGui().setSelected(selected);
+    newNode->setActive(active);
+    newRouter->getSnapshotExcludeParam() = snapshotExclude;
+
+    // The name is only free, on the macro too, once the old router is gone.
+    oldNode->deleteSelf();
+    newRouter->getNameParam() = name;
+
+    // Range first, so the value is not clamped to the new type's default range.
+    for(const string slot : {"Min", "Max", "Value"}){
+        auto numbers = savedNumbers.find(slot);
+        auto* parameter = findSlot(*newNode, slot);
+        if(numbers != savedNumbers.end() && parameter != nullptr) writeNumbers(*parameter, numbers->second);
+    }
+
+    // A cable the new type does not take is dropped.
+    for(const auto& saved : savedConnections){
+        auto* parameter = findSlot(*newNode, saved.slot);
+        if(parameter == nullptr) continue;
+        auto* connection = saved.incoming
+            ? createConnection(*saved.other, *parameter)
+            : createConnection(*parameter, *saved.other);
+        if(connection != nullptr) connection->setIsPersistent(saved.persistent);
+    }
+    return newNode;
+}
+
 ofxOceanodeNode& ofxOceanodeContainer::createNode(unique_ptr<ofxOceanodeNodeModel> && nodeModel, int identifier, bool isPersistent, string additionalInfo){
     if(!pendingCanvasEdit && !replayingCanvasEdit) clearCanvasHistory();
     auto &collection = !isPersistent ? dynamicNodes : persistentNodes;
