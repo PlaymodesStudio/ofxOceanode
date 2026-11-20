@@ -109,6 +109,7 @@ struct OceanodeColors {
     inline static ImVec4 CurveInflectionGuide  = {1.000f, 1.000f, 0.000f, 0.251f}; // inflection guide (yellow)
     inline static ImVec4 CurveAsymmetryGuide   = {0.000f, 1.000f, 1.000f, 0.251f}; // asymmetry guide (cyan)
     inline static ImVec4 CurveBParameterGuide  = {1.000f, 0.000f, 0.000f, 0.251f}; // B-parameter guide (red)
+    inline static ImVec4 CurveEditorLines      = {0.063f, 0.063f, 0.063f, 1.000f}; // grid lines of a timeline curve lane's editor (gray 16)
 
     // ── Floating windows & popups (ofxOceanodeFloatingWindowDecor.h) ──────────
     inline static ImVec4 FloatingWindowBorder  = {0.209f, 0.209f, 0.209f, 1.000f};  // outline of undocked windows and popups
@@ -195,6 +196,7 @@ struct OceanodeColors {
         CurveInflectionGuide  = {1.000f, 1.000f, 0.000f, 0.251f};
         CurveAsymmetryGuide   = {0.000f, 1.000f, 1.000f, 0.251f};
         CurveBParameterGuide  = {1.000f, 0.000f, 0.000f, 0.251f};
+        CurveEditorLines      = {0.063f, 0.063f, 0.063f, 1.000f};
 
         FloatingWindowBorder  = {0.209f, 0.209f, 0.209f, 1.000f};
         FloatingWindowShadow  = {0.000f, 0.000f, 0.000f, 0.382f};
@@ -275,6 +277,7 @@ struct OceanodeColors {
             { "OC_CurveInflectionGuide",  &CurveInflectionGuide  },
             { "OC_CurveAsymmetryGuide",   &CurveAsymmetryGuide   },
             { "OC_CurveBParameterGuide",  &CurveBParameterGuide  },
+            { "OC_CurveEditorLines",      &CurveEditorLines      },
             // Floating windows
             { "OC_FloatingWindowBorder",  &FloatingWindowBorder  },
             { "OC_FloatingWindowShadow",  &FloatingWindowShadow  },
