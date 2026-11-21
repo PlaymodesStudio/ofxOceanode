@@ -1042,6 +1042,27 @@ void ofxOceanodeNodeGui::renderParameterPopup(ofxOceanodeAbstractParameter& absP
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(16, 16));
 
     if(ImGui::BeginPopup("Param Popup")){
+        // A disconnected vector parameter can keep a multi-value vector (for example a
+        // macro router restored from a preset or snapshot). Offer to collapse it back to
+        // a single value, keeping its first element.
+        auto returnToScalar = [&](auto typeTag){
+            using T = decltype(typeTag);
+            if(absParam.valueType() != typeid(vector<T>).name()) return;
+            if(absParam.hasInConnection()) return;
+            if(absParam.getFlags() & ofxOceanodeParameterFlags_ReadOnly) return;
+            auto param = absParam.cast<vector<T>>().getParameter();
+            if(param->size() <= 1) return;
+            if(ImGui::Selectable("Return to scalar")){
+                T scalar = param->front();
+                if(!param.getMin().empty() && !param.getMax().empty()){
+                    scalar = static_cast<T>(ofClamp(scalar, param.getMin()[0], param.getMax()[0]));
+                }
+                param = vector<T>(1, scalar);
+            }
+            ImGui::Separator();
+        };
+        returnToScalar(float());
+        returnToScalar(int());
         if(absParam.isScoped()){
             if(ImGui::Selectable("Remove from Scope")){
                 ofxOceanodeScope::getInstance()->removeParameter(&absParam);

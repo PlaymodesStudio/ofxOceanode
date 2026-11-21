@@ -36,6 +36,7 @@ struct OceanodeColors {inline static ImVec4 TransparentButton{0,0,0,0};};
 struct Container {
     struct Timeline {void requestNoteGroupSetup(int*){}} timeline;
     void drawNodeMenu(Model&){}
+    int countReducibleMacroPortals(Node&){return 0;}
     Container* getAutomationExtension(){return this;}
     vector<Node*> getSelectedModules(){vector<Node*> out;for(auto& n:nodes)if(n.gui.selected)out.push_back(&n);return out;}
 } containerStorage;
@@ -47,7 +48,7 @@ vector<int*> getPortalizableOutputs(const vector<Node*>&){return {};}
 vector<int*> getPortalizableInputConnections(Node*){return {};}
 void portalizeOutput(int*){} void portalizeInput(int*){} void autoLayoutNodes(const vector<Node*>&){}
 map<string,int> nodesDrawingOrder{{"Node_1",1},{"Node_2",0}};
-string lastSelectedNode,macroExtractionKey;
+string lastSelectedNode,macroExtractionKey,macroPortalReductionKey;
 bool someDragAppliedToSelection=false,popup=false,overlap=false;
 Node* customGuiContextNode=nullptr;
 ImVec2 titlePoints[2],arrowPoint,closePoint,bodyPoint,cancelPoint;
