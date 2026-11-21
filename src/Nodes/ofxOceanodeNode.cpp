@@ -635,10 +635,11 @@ const std::vector<std::string>& ofxOceanodeNode::nodeSettingsKeys(){
 
 void ofxOceanodeNode::saveNodeSettings(ofJson& json){
     if(!snapshots->isDefault()) json["__NodeSnapshots"] = snapshots->toJson();
-    if(hiddenParameters.empty() && scopeOverrides.empty()) return;
+    if(hiddenParameters.empty() && scopeOverrides.empty() && foldedGroups.empty()) return;
     ofJson settings = ofJson::object();
     if(!hiddenParameters.empty()) settings["Hidden"] = std::vector<std::string>(hiddenParameters.begin(), hiddenParameters.end());
     if(!scopeOverrides.empty()) settings["Scope"] = scopeOverrides;
+    if(!foldedGroups.empty()) settings["FoldedGroups"] = std::vector<std::string>(foldedGroups.begin(), foldedGroups.end());
     json["__ParameterSettings"] = settings;
 }
 
@@ -647,6 +648,7 @@ void ofxOceanodeNode::loadNodeSettings(const ofJson& json){
     syncSnapshotSelector();
     hiddenParameters.clear();
     scopeOverrides.clear();
+    foldedGroups.clear();
     if(!json.contains("__ParameterSettings") || !json["__ParameterSettings"].is_object()) return;
     const auto& settings = json["__ParameterSettings"];
     auto readFlags = [&](const char* key, std::map<std::string, bool>& out){
@@ -659,6 +661,9 @@ void ofxOceanodeNode::loadNodeSettings(const ofJson& json){
         for(const auto& name : settings["Hidden"]) if(name.is_string()) hiddenParameters.insert(name.get<std::string>());
     }
     readFlags("Scope", scopeOverrides);
+    if(settings.contains("FoldedGroups") && settings["FoldedGroups"].is_array()){
+        for(const auto& label : settings["FoldedGroups"]) if(label.is_string()) foldedGroups.insert(label.get<std::string>());
+    }
 }
 
 // ── Snapshot selector ────────────────────────────────────────────────────────

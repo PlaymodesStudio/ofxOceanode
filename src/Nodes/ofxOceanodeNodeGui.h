@@ -76,6 +76,9 @@ public:
     glm::vec2 getSinkConnectionPositionFromParameter(ofxOceanodeAbstractParameter& parameter);
     // False until the node has been drawn with its current parameter list
     bool hasConnectionPosition(ofxOceanodeAbstractParameter& parameter);
+    // True when the row sits inside a folded separator group (as of the
+    // last detailed draw). Its pins sit on the group's header row.
+    bool isParameterFolded(ofxOceanodeAbstractParameter& parameter);
     
 #ifdef OFXOCEANODE_USE_MIDI
     void setIsListeningMidi(bool b){isListeningMidi = b;};
@@ -92,7 +95,8 @@ private:
     
     vector<glm::vec2> inputPositions;
     vector<glm::vec2> outputPositions;
-    
+    vector<char> foldedRows;
+
     ofRectangle guiRect;
     
     bool guiToBeDestroyed;

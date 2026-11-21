@@ -78,6 +78,8 @@ struct MacroGuiState {
 	// Unsaved library edits, reviewed before Save, or before Load replaces them.
 	bool openUnsavedPopup = false;
 	bool unsavedForLoad = false;
+	// Closing the shared tab: offer to save, else discard the edits.
+	bool unsavedForClose = false;
 	bool unsavedLoadIsPreset = false;
 	std::string unsavedLoadPath;
 	std::string unsavedLoadName;
@@ -216,6 +218,7 @@ public:
 	
 	// Instances of the same global Macro share one tab, which always shows the
 	// window instance: the one whose tab is open, else the first one in the patch.
+	// Show opens the instance it is clicked on when no instance has the tab.
 	ofxOceanodeNodeMacro& windowInstance();
 	// Where a node inside this Macro is shown: the window instance and its
 	// matching node (nullptr when the open graph no longer has that node).
@@ -224,6 +227,9 @@ public:
 	// Opens and focuses the window instance's tab.
 	void activateWindow(bool focus = true);
 	void hideSharedWindow();
+	// Closes the shared tab, first asking to save or discard unsaved edits of
+	// the instance shown in it, so they can't be left behind a closed tab.
+	void requestCloseSharedWindow();
 	// This instance's own tab, as saved in layouts.
 	bool isWindowVisible() const { return showWindow; }
 	// True when this instance or another instance of its global Macro has the tab.
@@ -240,7 +246,7 @@ public:
 	void setWindowVisible(bool visible, bool focus = true){
         if(!focus) { showWindow = visible; return; }
 		if(visible) activateWindow();
-		else hideSharedWindow();
+		else requestCloseSharedWindow();
 	}
 	
 private:
@@ -275,6 +281,10 @@ private:
 	void clearContentsForLoad(const std::string& path);
 	void applyLoadCarryOver(const std::string& path);
 	void updateMacroDirectoryStructure();
+	// Reloads the library definition in place, keeping this instance's input values.
+	void reloadGlobalDefinition();
+	// Drops unsaved library edits: reloads the saved definition as clean.
+	void discardGlobalEdits();
 	
 	// ─── Initialization helpers (called from setup) ───────────────────────
 	void initializeContainer(const string& additionalInfo);
@@ -312,6 +322,8 @@ private:
 	void renderMacroDeleteDialog();
 	bool reviewUnsavedChanges(bool forLoad, const string& loadPath = "", const string& loadName = "", bool loadIsPreset = false);
 	void renderMacroUnsavedChangesDialog();
+	// Opens the unsaved-changes dialog for closing the tab; false when clean.
+	bool reviewUnsavedChangesBeforeClose();
 	void renderPresetNamingGui();
 	void renderMinimizedView(ImVec2 size);
 	void renderSnapshotMatrix();

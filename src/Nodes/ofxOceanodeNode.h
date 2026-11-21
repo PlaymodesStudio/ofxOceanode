@@ -89,6 +89,12 @@ public:
     // Shown as a scope when the node is folded (and in the Inspector).
     bool isParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p) const;
     void setParameterScopedWhenFolded(ofxOceanodeAbstractParameter& p, bool scoped);
+    // Separator groups folded in the node GUI, keyed by separator label.
+    // A group is a labelled separator and the rows up to the next one.
+    bool isGroupFolded(const std::string& label) const { return foldedGroups.count(label) != 0; }
+    void setGroupFolded(const std::string& label, bool folded){
+        if(folded) foldedGroups.insert(label); else foldedGroups.erase(label);
+    }
 
     // Node Snapshots: stored parameter values, recalled with a glide.
     bool supportsSnapshots();
@@ -119,6 +125,7 @@ private:
 
     std::set<std::string> hiddenParameters;
     std::map<std::string, bool> scopeOverrides;
+    std::set<std::string> foldedGroups;
     std::unique_ptr<ofxOceanodeNodeSnapshots> snapshots;
     std::shared_ptr<ofParameter<int>> snapshotSelector;
     std::vector<std::string> snapshotSelectorOptions;

@@ -48,6 +48,8 @@ SUPPORT = r'''
 void ofxOceanodeCanvas::draw(bool*,ofColor,string) { assert(false); }
 void ofxOceanodeContainer::draw() { ofEventArgs args; for(auto* n:getAllModules()) if(n->getActive()) n->draw(args); }
 void ofxOceanodeNodeMacro::renderPresetControlGui() { assert(false); }
+void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() { assert(false); }
+bool ofxOceanodeNodeMacro::reviewUnsavedChangesBeforeClose() { return false; }
 bool ofxOceanodeNodeMacro::drawNodeParameter(ofxOceanodeAbstractParameter&, float, float) { assert(false); return false; }
 void ofxOceanodeNodeMacro::renderPresetNamingGui() { assert(false); }
 void ofxOceanodeNodeMacro::renderMinimizedView(ImVec2) { assert(false); }
@@ -414,12 +416,23 @@ int main(int argc,char** argv) {
         // A source load is a preset recall for its nodes, without app-level preset events.
         assert(probeRecalls>recallsBefore && probeRecallsWhileLoading-loadingBefore==probeRecalls-recallsBefore);
         assert(!ofxOceanodeShared::isPresetLoading());
-        // Showing any instance opens the first one; only it can close the tab.
+        // With no tab open the first instance stands for the Macro; only it saves.
         assert(&second.windowInstance()==&first && &local.windowInstance()==&local);
         // Only the first instance may save over the library Macro.
         assert(first.canSaveDefinition() && !second.canSaveDefinition() && local.canSaveDefinition());
         assert(first.sharesGlobalMacroWith(second) && !first.sharesGlobalMacroWith(local));
+        // Show opens the instance it is clicked on, which then owns the tab and saves.
         second.setWindowVisible(true);
+        assert(second.isWindowVisible() && !first.isWindowVisible() && first.isSharedWindowVisible());
+        assert(first.isWindowShownByOtherInstance() && !second.isWindowShownByOtherInstance());
+        assert(second.canSaveDefinition() && !first.canSaveDefinition());
+        assert(&first.windowInstance()==&second);
+        // While it is open, showing another instance keeps the open one.
+        first.activateWindow(); assert(second.isWindowVisible() && !first.isWindowVisible());
+        second.setWindowVisible(false);
+        assert(!first.isSharedWindowVisible() && !second.isSharedWindowVisible());
+        // One at a time: once closed, the first instance can be opened instead.
+        first.setWindowVisible(true);
         assert(first.isWindowVisible() && !second.isWindowVisible() && second.isSharedWindowVisible());
         assert(second.isWindowShownByOtherInstance() && !first.isWindowShownByOtherInstance());
         assert(!local.isSharedWindowVisible());
