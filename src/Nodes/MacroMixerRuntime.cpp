@@ -781,7 +781,7 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
         const bool bridged=std::any_of(interface.routers.begin(),interface.routers.end(),[&](const auto& r) {
             return r.direction=="Output" && bool(MacroMixerMixing::registry().policy(r.type,mixPolicy(r)).createProcessor);
         });
-        bool built=false; MacroMixerSource::MorphSnapshot start;
+        bool built=false, inPlaceRefused=false; MacroMixerSource::MorphSnapshot start;
         if(!second) {
             if(sceneFailed.count(target)) failure(target);
             // As a request waits: the origin plays alone, backends ready, before a destination loads.
@@ -814,6 +814,7 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
                         inPlaceNote=current->morphFallbackReason.empty() ? std::string("incompatible structure or configuration")
                                                                          : current->morphFallbackReason;
                     } else inPlaceNote="the destination could not be read";
+                    inPlaceRefused=true;
                 }
                 if(morph) start=current->captureMorphValues();
                 second=buildSceneGraph(target); built=true;
@@ -832,6 +833,8 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
         audioMove.clear(); audioNoted=false; audioDetailsID.clear();
         if(built) preparePlacement(*next->placement,current->revision,next->revision,false);
         if(morph) { prepareSceneMorph(start,policies,logBlend); if(!next) failure(target); }
+        // Asked in place and refused by the sources: a graph fallback, in this transition's Details.
+        if(next && morph && inPlaceRefused) transitionDetails[target].push_back({"fallback","Graph","Not in place: "+inPlaceNote});
     } catch(const std::exception& e) {
         preparing=false; errors={{"scene",e.what()}};
         // (A morph in place that failed half way: the graph is let go below or by the next scene.)
