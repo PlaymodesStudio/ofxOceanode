@@ -241,6 +241,11 @@ public:
     // whole. Asked when a piano roll is set up and on every timeline update
     // (voice count, kit), so keep it cheap.
     virtual bool getTimelineInstrument(ofxOceanodeTimelineInstrument&) { return false; }
+    // Items of the node's own in the canvas's right-click "Node Context"
+    // menu, drawn with ImGui inside that popup. Return true when the action
+    // deleted this node: the canvas then forgets it and closes the menu.
+    virtual bool drawNodeContextMenu() { return false; }
+#define OFXOCEANODE_HAS_NODE_CONTEXT_MENU 1
     // Optional native/dockable editor navigation, shared by timeline and other UIs.
     // Existing SC nodes expose these title/toggle methods through scNode.
     virtual std::string getWindowTitle() { return {}; }

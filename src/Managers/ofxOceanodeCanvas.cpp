@@ -2575,6 +2575,11 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
 #endif
                 if(auto* extension = container->getAutomationExtension())
                     extension->drawNodeMenu(customGuiContextNode->getNodeModel());
+                // The node's own items last: one of them may delete the node
+                if(customGuiContextNode->getNodeModel().drawNodeContextMenu()){
+                    customGuiContextNode = nullptr;
+                    ImGui::CloseCurrentPopup();
+                }
             }
             ImGui::EndPopup();
         }
