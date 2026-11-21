@@ -184,7 +184,31 @@ ofxOceanodeContainer::ResolvedParameter ofxOceanodeContainer::resolveParameterFr
     
     ofxOceanodeContainer* targetContainer = getContainerForCanvasID(canvasID);
     if(targetContainer == nullptr) targetContainer = this;
-    
+
+    // Fast path: the node whose own group is the path's group, through the
+    // name map, instead of scanning every parameter of every node (timeline
+    // Global Tracks resolve their paths several times per frame). Only a
+    // match the scan below would accept for that node is returned; anything
+    // else falls through to the scan (hierarchy matches, renamed groups).
+    {
+        const auto found = targetContainer->parameterGroupNodesMap.find(parsed.groupName);
+        if(found != targetContainer->parameterGroupNodesMap.end() && found->second != nullptr) {
+            auto* node = found->second;
+            ofParameterGroup& params = node->getParameters();
+            // (A name or escaped name equal to paramName escapes to an indexed
+            // name, so a miss here is a miss in this node.)
+            if(params.getEscapedName() == parsed.groupName && params.contains(parsed.paramName)) {
+                for(std::size_t i = 0; i < params.size(); i++) {
+                    ofAbstractParameter& absParam = params.get(i);
+                    auto* oceanodeParam = dynamic_cast<ofxOceanodeAbstractParameter*>(&absParam);
+                    if(oceanodeParam == nullptr) continue;
+                    if(absParam.getName() == parsed.paramName || absParam.getEscapedName() == parsed.paramName)
+                        return ResolvedParameter(oceanodeParam, node);
+                }
+            }
+        }
+    }
+
     // Get all nodes from the target container
     vector<ofxOceanodeNode*> allNodes = targetContainer->getAllModules();
     
