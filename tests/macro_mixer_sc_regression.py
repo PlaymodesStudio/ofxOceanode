@@ -9,6 +9,7 @@ mixer.PRELUDE += r'''
 #include "serverManager.h"
 #include "scGlobalPitch.h"
 #include "MacroMixerSCBus.h"
+#include "scBake.h"
 #include "MacroMixerServerAllocator.h"
 #include "ofxOceanodeSuperColliderConfig.h"
 class TestTone : public scNode {
@@ -42,6 +43,16 @@ public:
     TestPinned():TestTone("Mixer Test Pinned") {}
     void setup() override {TestTone::setup();addParameter(server.set("Server",0,0,2));}
 };
+// A source with an N Chan parameter, as SC SynthDef nodes and Mixer Pro have.
+class TestWide : public TestTone {
+    ofParameter<int> width;
+public:
+    TestWide():TestTone("Mixer Test Wide") {}
+    void setup() override {TestTone::setup();addParameter(width.set("N Chan",4,1,128));}
+    void setWidth(int n) {width=n;}
+};
+// scNode.cpp's node menu offers SC Bake (scBake.cpp is not built here).
+bool scBake::drawNodeMenu(scNode&) { return false; }
 static ofxSCServer* setupServer=nullptr;
 static bool synthdefsLoading=false;
 '''
@@ -71,7 +82,7 @@ mixer.CASES=r'''
 static void recompute(serverManager& m,ofxSCServer& s) {m.recomputeGraph();s.acknowledge();}
 static void near(double a,double b) {if(!std::isfinite(a)||std::abs(a-b)>=.0001) {std::cerr<<a<<" != "<<b<<"\n";std::abort();}}
 static nodePort bus(const MacroMixerRuntime& r) {return MacroMixerMixing::object<nodePort>(r.outputValue("audio"));}
-static int bridgeID(ofxSCServer& s) {for(auto& n:s.synths) if(n.second.name=="oceanodeMacroMixer2") return n.first;return -1;}
+static int bridgeID(ofxSCServer& s) {for(auto& n:s.synths) if(n.second.name.rfind("oceanodeMacroMixer",0)==0) return n.first;return -1;}
 static ofxOceanodeMacroMixer& innerMixer(ofxOceanodeNodeMacro& macro) {
     for(auto* n:macro.getContainer()->getAllModules())
         if(auto* m=dynamic_cast<ofxOceanodeMacroMixer*>(&n->getNodeModel())) return *m;
@@ -183,7 +194,7 @@ int main(int argc,char** argv) {
     write(silent,"connections.json",{{"SC_Mixer_Test_Effect_1",{{"Out",{{"Router_ScBus_1",{{"Value",nullptr}}}}}}}});
     for(const auto& spec:std::vector<std::pair<std::string,std::pair<float,float>>>{{"linear",{.5,.5}},{"equal_power",{std::sqrt(.5f),std::sqrt(.5f)}},{"switch",{0,1}},{"fade_out",{0,0}}}) {
         auto& output=parent.createNode(registry->create("SC Output"),1).getNodeModel();
-        MacroMixerRuntime r(parent); assert(r.setContract(c)&&r.setMorphPolicy("ScBus",spec.first,{{"smoothing_ms",5}}));
+        MacroMixerRuntime r(parent); assert(r.setContract(c)&&r.setMorphPolicy("ScBus",spec.first,{{"smoothing_ms",5},{"channels",2}}));
         assert(r.importMacro(a)&&r.importMacro(routed)&&r.importMacro(silent));
         r.request(a,0,0,true);r.update(0);output.getParameter<nodePort>("In")=bus(r);recompute(m1,s1);r.update(1);
         const auto* graph=r.origin();
@@ -192,7 +203,7 @@ int main(int argc,char** argv) {
         const int toneID=tone.getLastSynthID(&s1),effectID=effect.getLastSynthID(&s1),toneBus=tone.getOutputBusIndex(&s1,0),effectBus=effect.getOutputBusIndex(&s1,0);
         const auto& details=r.sourceDetails(r.importedMacro(routed)->id());
         assert(std::none_of(details.begin(),details.end(),[](const auto& d){return d.kind=="fallback";}));
-        assert(std::any_of(details.begin(),details.end(),[&](const auto& d){return d.kind=="mix"&&d.type=="ScBus"&&d.policy==spec.first&&d.options["smoothing_ms"]==5;}));
+        assert(std::any_of(details.begin(),details.end(),[&](const auto& d){return d.kind=="mix"&&d.type=="ScBus"&&d.policy==spec.first&&!d.options.contains("smoothing_ms")&&!d.options.contains("channels");}));
         r.request(routed,1000,0,true);r.update(10); assert(r.morphingInPlace()&&r.origin()==graph);
         auto* internal=effect.getParameter<nodePort>("In").get().getNodeRef(); assert(internal&&internal!=&tone);
         synthdefsLoading=true;recompute(m1,s1);r.update(100);assert(r.progress()==0);near(tone.getParameter<float>("Freq"),220);
@@ -201,7 +212,7 @@ int main(int argc,char** argv) {
         s1.acknowledge();r.update(210);r.update(710);near(r.progress(),.5);near(tone.getParameter<float>("Freq"),440);
         const int internalID=internal->getLastSynthID(&s1);assert(internalID>0);
         near(s1.synths.at(internalID).controls.at("gainA"),spec.second.first);near(s1.synths.at(internalID).controls.at("gainB"),spec.second.second);
-        near(s1.synths.at(internalID).controls.at("smoothing"),.005);
+        near(s1.synths.at(internalID).controls.at("smoothing"),.02);
         assert(tone.getOutputBusIndex(&s1,0)==toneBus&&effect.getOutputBusIndex(&s1,0)==effectBus);
         assert(effect.inputBus.at(&s1)==internal->getOutputBusIndex(&s1,0));
         r.finish();r.update(720);recompute(m1,s1);r.update(721);r.update(722);assert(!r.transitioning()&&r.origin()==graph);
@@ -465,8 +476,11 @@ int main(int argc,char** argv) {
     for(const auto& spec:std::vector<std::pair<std::string,std::pair<float,float>>>{{"linear",{.5,.5}},{"equal_power",{std::sqrt(.5f),std::sqrt(.5f)}},{"switch",{0,1}},{"fade_out",{0,0}}}) {
         const auto& policy=MacroMixerMixing::registry().policy("ScBus",spec.first);
         const auto options=policy.options(ofJson::object());
-        assert(options["channels"]==2 && options["smoothing_ms"]==20);
-        for(const auto& bad:std::vector<ofJson>{{{"channels",0}},{{"channels",129}},{{"channels",1.5}},{{"smoothing_ms",-1}},{{"unknown",1}}}) {
+        assert(!options.contains("channels") && !options.contains("smoothing_ms"));
+        // Saved before they were removed: still loads, dropped.
+        const auto legacy=policy.options({{"channels",4},{"smoothing_ms",5}});
+        assert(!legacy.contains("channels") && !legacy.contains("smoothing_ms"));
+        for(const auto& bad:std::vector<ofJson>{{{"unknown",1}}}) {
             bool rejected=false;try{policy.options(bad);}catch(...){rejected=true;}assert(rejected);
         }
         auto fn=policy.createProcessor();TestTone aNode,bNode;aNode.setup();bNode.setup();
@@ -475,8 +489,18 @@ int main(int argc,char** argv) {
         bridge->buildSynth(&s1);bridge->createSynth(&s1);bridge->graphDidRebuild(&s1,true);int id=bridge->getLastSynthID(&s1);
         near(s1.synths.at(id).controls.at("gainA"),spec.second.first);near(s1.synths.at(id).controls.at("gainB"),spec.second.second);
         near(s1.synths.at(id).controls.at("smoothing"),.02);
+        // Neither source declares its width: the fallback.
+        assert(s1.synths.at(id).name=="oceanodeMacroMixer16");
         fn(av,bv,0,options);near(s1.synths.at(id).controls.at("gainA"),1);near(s1.synths.at(id).controls.at("gainB"),0);
         fn(av,bv,1,options);near(s1.synths.at(id).controls.at("gainA"),0);near(s1.synths.at(id).controls.at("gainB"),1);
+        // The width follows the wider source, replacing the running synth in place.
+        TestWide wide,narrow;wide.setup();narrow.setup();narrow.setWidth(2);
+        auto wv=MacroMixerMixing::object("ScBus",nodePort(0,&wide)),nv=MacroMixerMixing::object("ScBus",nodePort(0,&narrow));
+        fn(wv,nv,.5f,options);const int wideID=bridge->getLastSynthID(&s1);
+        assert(wideID!=id && !s1.synths.count(id) && s1.synths.at(wideID).name=="oceanodeMacroMixer4" && bridge->getOutputNumChannels(0)==4);
+        near(s1.synths.at(wideID).controls.at("smoothing"),.02);
+        fn(nv,nv,1,options);const int narrowID=bridge->getLastSynthID(&s1);
+        assert(narrowID!=wideID && !s1.synths.count(wideID) && s1.synths.at(narrowID).name=="oceanodeMacroMixer2");
         bridge->free(&s1);
     }
     auto& out=parent.createNode(registry->create("SC Output"),1).getNodeModel();

@@ -202,9 +202,7 @@ void drawMixOptions(const std::string& type,const ofJson& options,const std::fun
             : type=="Texture" && option.key()=="softness" ? "Edge softness"
             : type=="Texture" && option.key()=="cells" ? "Noise cells"
             : type=="Texture" && option.key()=="seed" ? "Noise seed"
-            : type==MacroMixerMixing::triggerType && option.key()=="seed" ? "Seed"
-            : type=="ScBus" && option.key()=="channels" ? "Channels"
-            : type=="ScBus" && option.key()=="smoothing_ms" ? "Gain smoothing (ms)" : option.key().c_str();
+            : type==MacroMixerMixing::triggerType && option.key()=="seed" ? "Seed" : option.key().c_str();
         if(value.is_boolean()) { bool v=value.get<bool>(); changed=ImGui::Checkbox(label,&v); value=v; }
         else if(value.is_number()) {
             ImGui::TextUnformatted(label); ImGui::SetNextItemWidth(-1);

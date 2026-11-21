@@ -37,6 +37,10 @@ public:
     bool isNRTCaptureOnly() const {return nrtCaptureOnly;}
     std::vector<std::string> messages;
     void setBLatency(bool b) { latency=b; }
+    // Timing scopes scTransportSync uses (reached through scNode.cpp): no-ops here.
+    static uint64_t timetagForSteadyTimeUs(uint64_t us) { return us; }
+    struct ScopedTimetag { explicit ScopedTimetag(uint64_t) {} };
+    struct ScopedNRTOffset { explicit ScopedNRTOffset(double) {} };
     void sendMsg(ofxOscMessage& m) { messages.push_back(m.getAddress()); }
 };
 inline int SCFakeAllocator::alloc(int) {
@@ -65,8 +69,11 @@ public:
     ofxSCSynth(std::string n,ofxSCServer* s):server(s),name(std::move(n)) { ++live; }
     ~ofxSCSynth() {--live;}
     template<typename T> void set(const std::string& key,const T& v) { controls[key]=double(v); if(server->synths.count(nodeID)) server->synths[nodeID].controls[key]=double(v); }
-    void create(int=0,int=1) { server->synths[nodeID]={name,controls,true}; }
-    void createAndRun(int=0,int=1,bool run=true) { server->synths[nodeID]={name,controls,run}; }
+    bool requested=false;
+    bool isCreationRequested() const { return requested; }
+    // addAction 4 (replace) takes the target's place: the target is gone.
+    void create(int position=0,int target=1) { createAndRun(position,target,true); }
+    void createAndRun(int position=0,int target=1,bool run=true) { if(position==4) server->synths.erase(target); server->synths[nodeID]={name,controls,run}; requested=true; }
     void moveBefore(int) {}
     void free() { if(server->synths.erase(nodeID)) ++server->synthFrees; }
     void run(bool b) { if(server->synths.count(nodeID)) server->synths[nodeID].running=b; }
