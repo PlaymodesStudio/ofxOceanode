@@ -171,6 +171,9 @@ public:
 		return presetManager.isLocal();
 	}
 	const string& getCurrentMacroPath() const { return presetManager.getCurrentMacroPath(); }
+	// The folder a local macro was last saved to or loaded from, at any
+	// depth (inside its preset, or inside the macro around it). Empty: never saved.
+	const string& getLocalPresetPath() const { return presetManager.getPresetPath(); }
 	const std::deque<string>& getCurrentMacroCategory() const { return presetManager.getCurrentCategory(); }
 	const std::vector<string>& getRouterSortOrder() const { return sortOrder.getOrder(); }
 	// Swaps one of this macro's routers for another type. The pin keeps its

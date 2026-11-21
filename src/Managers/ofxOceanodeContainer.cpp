@@ -328,6 +328,7 @@ void ofxOceanodeContainer::update(){
 
 void ofxOceanodeContainer::draw(){
     ofEventArgs args;
+    if(automationExtension != nullptr) automationExtension->draw();
     for(auto &nodeTypeMap : dynamicNodes){
         for(auto &node : nodeTypeMap.second){
             if(node.second->getActive())

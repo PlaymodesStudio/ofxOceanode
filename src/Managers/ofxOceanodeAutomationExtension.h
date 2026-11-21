@@ -21,6 +21,9 @@ public:
     virtual void evaluateAutomation() = 0;
     virtual void applyAutomation() = 0;
     virtual void endParameterCache() = 0;
+    // Called on the owning container's draw, before its nodes draw, with the
+    // GL context current: what the extension itself has to render.
+    virtual void draw() {}
     // Load after node presets exist; save participates in the core save transaction.
     virtual bool loadPreset(const std::string&) = 0;
     virtual bool savePreset(const std::string&) const = 0;

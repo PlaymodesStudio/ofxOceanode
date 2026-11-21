@@ -109,7 +109,14 @@ public:
         void drawMorphConnections();
         bool morphConnectionsReady() const;
         void cancelMorph();
+        // setMorphProgress, then commitMorph once progress reaches 1.
         void applyMorph(float progress);
+        // Moves the morph to a progress, in either direction. Reaching 1 ends
+        // nothing: the morph stays prepared and can go back.
+        void setMorphProgress(float progress);
+        // Ends the morph on its destination (call it at progress 1): staged
+        // edits become the graph's definition. cancelMorph rolls back instead.
+        void commitMorph();
     private:
         struct TriggerLatch { ofParameter<void> port; ofEventListener listener; int count = 0; };
         mutable std::map<std::string, std::shared_ptr<TriggerLatch>> triggerLatches;

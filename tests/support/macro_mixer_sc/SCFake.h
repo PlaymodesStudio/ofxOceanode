@@ -65,6 +65,7 @@ public:
     ofxSCSynth(std::string n,ofxSCServer* s):server(s),name(std::move(n)) { ++live; }
     ~ofxSCSynth() {--live;}
     template<typename T> void set(const std::string& key,const T& v) { controls[key]=double(v); if(server->synths.count(nodeID)) server->synths[nodeID].controls[key]=double(v); }
+    void create(int=0,int=1) { server->synths[nodeID]={name,controls,true}; }
     void createAndRun(int=0,int=1,bool run=true) { server->synths[nodeID]={name,controls,run}; }
     void moveBefore(int) {}
     void free() { if(server->synths.erase(nodeID)) ++server->synthFrees; }

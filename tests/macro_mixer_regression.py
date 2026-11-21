@@ -169,7 +169,7 @@ def main(extra_sources=(), extra_includes=(), std='c++17'):
     with (contextlib.nullcontext(debug_build) if debug_build else tempfile.TemporaryDirectory(prefix='oceanode-macro-mixer-')) as tmp:
         tmp=Path(tmp); tmp.mkdir(parents=True,exist_ok=True)
         cpp=tmp/'regression.cpp'; cpp.write_text(native_production()+CASES)
-        sources=['src/Nodes/MacroMixerMixing.cpp','src/Nodes/MacroMixerSource.cpp','src/Nodes/MacroMixerRuntime.cpp','src/Nodes/ofxOceanodeMacroMixer.cpp',
+        sources=['src/Nodes/MacroMixerMixing.cpp','src/Nodes/MacroMixerSource.cpp','src/Nodes/MacroMixerRuntime.cpp','src/Nodes/ofxOceanodeMacroMixer.cpp','src/Nodes/MacroMixerGui.cpp','src/Nodes/MacroMixerPorts.cpp',
                  'src/Nodes/ofxOceanodeNode.cpp','src/ofxOceanodeParameter.cpp',
                  'src/Nodes/Default_Nodes/portal.cpp',
                  'src/Managers/ofxOceanodeTypesRegistry.cpp',

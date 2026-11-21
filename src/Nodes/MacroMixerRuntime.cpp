@@ -116,7 +116,7 @@ bool MacroMixerRuntime::removeMacro(const std::string& id) {
         const auto removedID = it->second->id();
         if(removedID == currentID() || removedID == destinationID() || removedID == queuedID()) clear();
         order.erase(std::remove(order.begin(), order.end(), removedID), order.end());
-        sourcePolicies.erase(removedID); problems.erase(removedID); windows.erase(removedID);
+        sourcePolicies.erase(removedID); problems.erase(removedID); windows.erase(removedID); sceneFailed.erase(removedID);
         const auto removed = it->second;
         imports.erase(it);
         // Kept-out choices leave with their source, so adding it again analyses
@@ -224,6 +224,7 @@ bool MacroMixerRuntime::setContract(const MacroMixerContract& contract) {
     for(auto it=renderers.begin();it!=renderers.end();)
         if(!ids.count(it->first)) it=renderers.erase(it); else ++it;
     sourceDetailCache.clear(); transitionDetails.clear(); invalidateChecks();
+    mixOverrides.clear(); sceneFailed.clear(); // The next scene reads them against the new routers.
     inputValues=std::move(inputs); interface = resolved;
     for(auto it = mixedValues.begin(); it != mixedValues.end();)
         if(!ids.count(it->first)) it = mixedValues.erase(it); else ++it;
@@ -419,6 +420,7 @@ bool MacroMixerRuntime::importMacro(const std::string& folder, bool refresh) {
     if(previous) noteProblem(previous->id());
     if(!revision) { noteBlocked(folder,refresh); return false; }
     sourceDetailCache.clear(); transitionDetails.clear();
+    sceneFailed.erase(revision->id()); // Read again: a scene may try it again.
     imports[sourceKey(folder)] = revision;
     if(!previous) order.push_back(revision->id());
     // A new source is checked (once it is in the order, so its pairs count); a
@@ -441,7 +443,7 @@ bool MacroMixerRuntime::keepOutOfGraph(const std::string& folder, const std::str
     if(folder.empty() || node.empty()) return false;
     keptOut->insert({folder,node});
     blocked.erase(std::remove_if(blocked.begin(),blocked.end(),[&](const auto& b) { return b.file==folder && b.node==node; }),blocked.end());
-    sourceDetailCache.clear(); invalidateChecks();
+    sourceDetailCache.clear(); invalidateChecks(); sceneFailed.clear();
     if(!blocked.empty()) return true;
     errors.clear();
     if(blockedRequest) {
@@ -459,7 +461,7 @@ void MacroMixerRuntime::cancelBlocked() {
 }
 bool MacroMixerRuntime::restoreKeptOutNode(const std::string& folder, const std::string& node) {
     if(!keptOut->erase({folder,node})) return false;
-    sourceDetailCache.clear(); invalidateChecks(); return true;
+    sourceDetailCache.clear(); invalidateChecks(); sceneFailed.clear(); return true;
 }
 
 ofJson MacroMixerRuntime::saveState() const {
@@ -482,11 +484,12 @@ ofJson MacroMixerRuntime::saveState() const {
     }
     auto keptOutNodes=ofJson::array();
     for(const auto& node:*keptOut) keptOutNodes.push_back({{"folder",savedFolder(node.first)},{"node",node.second}});
-    const auto playback = inPlaceTarget ? inPlaceTarget : next ? next->revision : current ? current->revision
+    // A scene's playback is its caller's playhead, not saved state.
+    const auto playback = sceneMode ? nullptr : inPlaceTarget ? inPlaceTarget : next ? next->revision : current ? current->revision
         : pending ? pending->revision : nullptr;
     return {{"version", 1}, {"routers", routers}, {"macros", entries}, {"inputs",inputs}, {"morphPolicies",policies},
         {"playback", playback ? ofJson(playback->id()) : ofJson(nullptr)},
-        {"morph", next ? nextMorph : current ? currentMorph : pending ? pending->morph : false},
+        {"morph", sceneMode ? false : next ? nextMorph : current ? currentMorph : pending ? pending->morph : false},
         {"keptOutNodes", keptOutNodes}};
 }
 
@@ -610,6 +613,8 @@ float MacroMixerRuntime::shape(float t, float power) {
 }
 
 void MacroMixerRuntime::request(const std::string& folder, float ms, float power, bool morph) {
+    // A scene decides what plays (present) until clear().
+    if(sceneMode) { errors = {{"macro", "Requests are unavailable while a timeline drives this mixer"}}; return; }
     pending = std::make_unique<Request>(Request{folder, importedMacro(folder),
         std::isfinite(ms) ? std::max(0.f, ms) : 0.f,
         std::isfinite(power) ? std::max(-1.f, std::min(1.f, power)) : 0.f, morph});
@@ -618,6 +623,167 @@ void MacroMixerRuntime::requestMacro(const std::string& id, float ms, float powe
     auto revision = macro(id);
     if(!revision) { errors = {{"macro", "Choose an imported Macro"}}; return; }
     request(revision->source(), ms, power, morph);
+}
+
+static bool sameMorphPolicies(const MacroMixerMorphPolicies& a, const MacroMixerMorphPolicies& b) {
+    return a.size()==b.size() && std::equal(a.begin(),a.end(),b.begin(),[](const auto& x,const auto& y) {
+        return x.first==y.first && x.second.policy==y.second.policy && x.second.options==y.second.options;
+    });
+}
+std::string MacroMixerRuntime::sceneStatus() const {
+    if(!sceneMode) return "";
+    if(!sceneNote.empty()) return sceneNote;
+    if(next && !sceneFlowing) return "Waiting for the audio backend";
+    if(!current) return "Empty";
+    return next ? current->revision->name()+" -> "+next->revision->name() : current->revision->name();
+}
+void MacroMixerRuntime::noteSceneFailure() {
+    // A scene would load a failed destination again every frame: remember it.
+    if(sceneMode && next && !errors.empty()) sceneFailed[next->revision->id()]=errors.front().message;
+}
+std::shared_ptr<MacroMixerRuntime::Graph> MacroMixerRuntime::buildSceneGraph(const std::string& id) {
+    // Called with no destination set, as an import requires.
+    std::shared_ptr<Graph> graph;
+    try {
+        const auto known=macro(id);
+        if(!known) { errors={{"scene","Unknown source: "+id}}; sceneFailed[id]="Unknown source"; return nullptr; }
+        const auto folder=known->source();
+        // Every activation reads its source again, as a request does.
+        if(!importMacro(folder,true)) {
+            sceneFailed[id]=errors.empty() ? std::string("Source could not be read") : errors.front().message; return nullptr;
+        }
+        preparing=true;
+        graph=MacroMixerSource::instantiate(parent,importedMacro(folder),errors,inputValues,keptOut);
+        preparing=false;
+        if(!graph) sceneFailed[id]=errors.empty() ? std::string("Source could not be loaded") : errors.front().message;
+    } catch(const std::exception& e) {
+        preparing=false; graph.reset(); errors={{"scene",e.what()}}; sceneFailed[id]=e.what();
+    }
+    return graph;
+}
+void MacroMixerRuntime::prepareSceneMorph(const MacroMixerSource::MorphSnapshot& start, const MacroMixerMorphPolicies& policies, float logBlend) {
+    const auto id=next->revision->id();
+    try {
+        next->prepareMorph(start,current.get(),policies,logBlend);
+        sceneMorphPolicies=policies; sceneLogBlend=logBlend;
+        std::vector<MacroMixerMorphDetail> details;
+        details.push_back({"context",next->revision->name(),"From "+current->revision->name()+" to "+next->revision->name()});
+        details.push_back({"live","Graph","The destination's controls morph on a second graph while the router outputs crossfade"});
+        transitionDetails[id]=std::move(details); audioDetailsID=id;
+    } catch(const std::exception& e) {
+        errors={{"morph",e.what()}}; sceneFailed[id]=e.what();
+        next->cancelMorph(); next.reset();
+    }
+}
+void MacroMixerRuntime::present(const MacroMixerScene& scene) {
+    // The scene takes over from requests: a queued one is dropped and a morph
+    // in place (a scene never starts one) rolls back.
+    pending.reset(); blockedRequest.reset(); finishRequested=false;
+    if(inPlaceTarget) { if(next) next->cancelMorph(); next.reset(); inPlaceTarget.reset(); }
+    sceneMode=true; sceneNote.clear(); sceneSettled=true;
+    currentMorph=false; // Mix policies shape a scene's outputs throughout.
+    const std::string origin=scene.origin;
+    // A source overlapping itself is a continuation, not a transition.
+    const std::string target=origin.empty() || scene.target==origin ? std::string() : scene.target;
+    sceneProgress=std::isfinite(scene.progress) ? std::max(0.f,std::min(1.f,scene.progress)) : 0.f;
+    for(auto it=sceneFailed.begin();it!=sceneFailed.end();) {
+        if(it->first!=origin && it->first!=target) it=sceneFailed.erase(it); else ++it;
+    }
+    const auto unready=[&](const std::string& note) { if(sceneNote.empty()) sceneNote=note; sceneSettled=false; };
+    const auto failure=[&](const std::string& id) {
+        const auto source=macro(id);
+        unready((source ? source->name() : id)+": "+sceneFailed[id]);
+    };
+    try {
+        std::map<std::string,MacroMixerMorphPolicy> overrides;
+        for(const auto& r:interface.routers) {
+            const auto found=scene.routerOverrides.find(r.id);
+            if(found==scene.routerOverrides.end() || r.direction!="Output" || found->second.policy.empty()) continue;
+            try {
+                const auto& policy=MacroMixerMixing::registry().policy(r.type,found->second.policy);
+                overrides[r.id]={policy.id,policy.options(found->second.options)};
+            } catch(const std::exception& e) { errors={{"routers",r.name+": "+e.what()}}; } // The contract's policy mixes it.
+        }
+        mixOverrides=std::move(overrides);
+        if(origin.empty()) { if(current || next) releasePlayback(); return; }
+        const bool morph=scene.morph && !target.empty();
+        MacroMixerMorphPolicies policies; float logBlend=1;
+        if(morph) {
+            policies=morphPoliciesInto(target);
+            for(const auto& item:scene.morphPolicies) {
+                try {
+                    const auto& policy=MacroMixerMixing::registry().policy(item.first,item.second.policy);
+                    policies[item.first]={policy.id,policy.options(item.second.options)};
+                } catch(const std::exception& e) { errors={{"Morph connections",e.what()}}; }
+            }
+            logBlend=std::isfinite(scene.logBlend) ? std::max(0.f,std::min(1.f,scene.logBlend)) : 1.f;
+        }
+        if(current && currentID()==origin && (next ? next->revision->id() : std::string())==target) {
+            // The same graphs. Mix/Morph or the morph's policies edited inside
+            // the overlap: the destination's controls go back to their own
+            // values and the morph is prepared again.
+            if(next && (nextMorph!=morph || (morph && (logBlend!=sceneLogBlend || !sameMorphPolicies(policies,sceneMorphPolicies))))) {
+                if(nextMorph) { next->setMorphProgress(1); next->commitMorph(); }
+                nextMorph=morph;
+                if(morph) { prepareSceneMorph(current->captureMorphValues(),policies,logBlend); if(!next) failure(target); }
+            }
+            return;
+        }
+        const bool hadGraphs=current || next;
+        auto a=std::move(current), b=std::move(next);
+        const bool hadNext=bool(b), bMorphing=b && nextMorph;
+        std::shared_ptr<Graph> first, second; bool firstWasNext=false, secondWasNext=false;
+        if(a && a->revision->id()==origin) first=std::move(a);
+        else if(b && b->revision->id()==origin) { first=std::move(b); firstWasNext=true; }
+        if(!target.empty()) {
+            if(a && a->revision->id()==target) second=std::move(a);
+            else if(b && b->revision->id()==target) { second=std::move(b); secondWasNext=true; }
+        }
+        // Cancel: a destination the scene left behind goes, with its morph.
+        if(b && bMorphing) b->cancelMorph();
+        b.reset(); a.reset(); nextMorph=false;
+        // Commit: the destination is now the origin, on its own values.
+        if(first && firstWasNext && bMorphing) { first->setMorphProgress(1); first->commitMorph(); }
+        // A destination kept for another origin starts again from its own values.
+        if(second && secondWasNext && bMorphing) { second->setMorphProgress(1); second->commitMorph(); }
+        const bool originChanged=!first || firstWasNext;
+        if(!first && !sceneFailed.count(origin)) first=buildSceneGraph(origin);
+        if(!first) { // Nothing plays without its origin.
+            second.reset();
+            if(hadGraphs) releasePlayback();
+            failure(origin); return;
+        }
+        current=std::move(first);
+        if(originChanged || hadNext) { sceneOutputsReady=false; sourceDetailCache.clear(); }
+        if(target.empty()) return;
+        const bool bridged=std::any_of(interface.routers.begin(),interface.routers.end(),[&](const auto& r) {
+            return r.direction=="Output" && bool(MacroMixerMixing::registry().policy(r.type,mixPolicy(r)).createProcessor);
+        });
+        bool built=false; MacroMixerSource::MorphSnapshot start;
+        if(!second) {
+            if(sceneFailed.count(target)) failure(target);
+            // As a request waits: the origin plays alone, backends ready, before a destination loads.
+            else if(bridged && !sceneOutputsReady) unready("Waiting for the audio backend");
+            else {
+                if(morph) start=current->captureMorphValues();
+                second=buildSceneGraph(target); built=true;
+                if(!second) failure(target);
+            }
+        } else if(morph) start=current->captureMorphValues();
+        if(!second) return;
+        next=std::move(second); nextMorph=morph; nextMorphReady=true; fadeRunning=false;
+        durationMs=0; biPow=0; heldProgress=0; mixedProgress=0;
+        sceneFlowing=!bridged; // A backend acknowledges the pair before any progress applies.
+        audioMove.clear(); audioNoted=false; audioDetailsID.clear();
+        if(built) preparePlacement(*next->placement,current->revision,next->revision,false);
+        if(morph) { prepareSceneMorph(start,policies,logBlend); if(!next) failure(target); }
+    } catch(const std::exception& e) {
+        preparing=false; errors={{"scene",e.what()}};
+        if(!origin.empty()) sceneFailed[origin]=e.what();
+        if(!target.empty()) sceneFailed[target]=e.what();
+        if(!current && !next) releasePlayback();
+        unready(e.what());
+    }
 }
 
 void MacroMixerRuntime::update() {
@@ -799,24 +965,30 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             }
         }
     }
-    if(morphing() && nextMorphReady && !fadeRunning) for(const auto& r:interface.routers) {
+    if(!sceneMode && morphing() && nextMorphReady && !fadeRunning) for(const auto& r:interface.routers) {
         const auto processor=processors.find(r.id);
         if(processor==processors.end()) continue;
         const auto& policy=MacroMixerMixing::registry().policy(r.type,r.policy);
         if(policy.ready && !policy.ready(outputValue(r.id))) nextMorphReady=false;
     }
-    const float t=(finishRequested || durationMs<=0) ? 1.f : float(std::max(0.0,clock()-startMs)/durationMs);
-    const float progress=morphing() && !nextMorphReady ? 0.f : next ? shape(t,biPow) : 1.f;
+    // A scene has no clock: its progress is given, and held where it last
+    // applied while a backend is not ready.
+    const float t=sceneMode ? 0.f : (finishRequested || durationMs<=0) ? 1.f : float(std::max(0.0,clock()-startMs)/durationMs);
+    const float progress=sceneMode ? (next ? (sceneFlowing ? sceneProgress : heldProgress) : 1.f)
+        : morphing() && !nextMorphReady ? 0.f : next ? shape(t,biPow) : 1.f;
     if(morphing()) {
-        try { next->applyMorph(progress); }
+        // The clock commits a morph when its fade arrives; a scene's commits
+        // only when the scene moves on to the destination (present).
+        try { next->setMorphProgress(progress); if(!sceneMode && progress>=1) next->commitMorph(); }
         catch(const std::exception& e) {
-            errors={{"morph",e.what()}}; next->cancelMorph(); next.reset(); inPlaceTarget.reset(); finishRequested=false; return;
+            errors={{"morph",e.what()}}; noteSceneFailure(); next->cancelMorph(); next.reset(); inPlaceTarget.reset(); finishRequested=false; return;
         }
     }
     const bool originValid = !current || morphingInPlace() || (current->setInputs(inputValues,false) && current->update());
     const bool destinationValid = !next || (next->setInputs(inputValues,false) && next->update());
     if(!originValid || !destinationValid) {
         errors = {{"runtime", !originValid ? current->failure : next->failure}};
+        noteSceneFailure();
         if(next) next->cancelMorph();
         next.reset(); inPlaceTarget.reset(); finishRequested = false;
         return; // Hold every last finite outer output on an invalid internal graph.
@@ -832,7 +1004,8 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     staged[router.id]=outputValue(router.id); // Owned previous frame, never a graph pointer.
                     continue;
                 }
-                const auto& policy=MacroMixerMixing::registry().policy(router.type,router.policy);
+                const auto& policy=MacroMixerMixing::registry().policy(router.type,mixPolicy(router));
+                const auto& options=mixOptions(router);
                 const auto graph=current;
                 if(outputsBypassed() && !policy.createProcessor) {
                     auto value = graph->read(router.id);
@@ -849,15 +1022,22 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
                     if(auto* object=std::get_if<MacroMixerMixing::Object>(&a)) { object->owner=graph; if(placing()) object->placement=graph->placement; }
                     if(auto* object=std::get_if<MacroMixerMixing::Object>(&b)) { object->owner=bGraph; if(placing()) object->placement=bGraph->placement; }
                     auto& processor=processors[router.id];
-                    if(processor.policy!=policy.id || !processor.function) processor={policy.id,policy.createProcessor()};
+                    if(processor.policy!=policy.id || !processor.function) {
+                        // Only a scene's override changes a live router's policy: the old bridge lets go first.
+                        if(processor.function) try {
+                            auto empty=MacroMixerMixing::neutral(router.type);
+                            processor.function(empty,empty,1.f,MacroMixerMixing::registry().policy(router.type,processor.policy).options(ofJson::object()));
+                        } catch(...) {}
+                        processor={policy.id,policy.createProcessor()};
+                    }
                     // Resource bridges retain graph leases and backend readiness.
                     // A graph morph feeds only the destination at the identity
                     // endpoint; no router-output interpolation takes place.
-                    auto result=processor.function(a,b,outputsBypassed() ? 1.f : progress,policy.options(router.options));
+                    auto result=processor.function(a,b,outputsBypassed() ? 1.f : progress,policy.options(options));
                     MacroMixerMixing::Registry::validate(router.type,result);
                     if(policy.ready) resourcesReady=policy.ready(result) && resourcesReady;
                     staged[router.id]=std::move(result);
-                } else staged[router.id]=MacroMixerMixing::registry().mix(router.type,router.policy,a,b,progress,router.options);
+                } else staged[router.id]=MacroMixerMixing::registry().mix(router.type,policy.id,a,b,progress,options);
             }
             mixedValues=std::move(staged); mixedProgress=progress;
             notePlacement(); // The processors placed the incoming side by now.
@@ -873,7 +1053,13 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             // controls keep their values and promotion waits. Restarting here
             // ran a second, empty pass of the whole duration after every morph
             // that rewired a resource cable.
-            if(next && !resourcesReady && !fadeRunning) { startMs=clock(); mixedProgress=0; if(morphing()) nextMorphReady=false; }
+            if(sceneMode) {
+                // No clock to hold: the next frame applies the scene's progress
+                // or, not ready, the last one that was.
+                if(next) { sceneFlowing=resourcesReady; if(resourcesReady) heldProgress=progress; }
+                else sceneOutputsReady=resourcesReady;
+            }
+            else if(next && !resourcesReady && !fadeRunning) { startMs=clock(); mixedProgress=0; if(morphing()) nextMorphReady=false; }
             else if(next && !resourcesReady) { // Completed fades hold at 1 and only wait.
                 const double now=clock(); if(t<1) startMs+=now-stallMs; stallMs=now; mixedProgress=t<1 ? heldProgress : progress;
             }
@@ -889,6 +1075,7 @@ void MacroMixerRuntime::updateWithClock(const std::function<double()>& clock) {
             else if(next) { fadeRunning=true; stallMs=clock(); heldProgress=progress; }
         } catch(const std::exception& e) {
             errors={{"runtime",std::string("Mix failed; holding all last finite router values: ")+e.what()}};
+            noteSceneFailure();
             if(next) next->cancelMorph();
             next.reset(); inPlaceTarget.reset();
         }
@@ -909,7 +1096,7 @@ void MacroMixerRuntime::draw() {
             for(const auto& r:interface.routers) if(r.direction=="Output" && r.type!=MacroMixerMixing::triggerType) {
                 const auto a=current->read(r.id), b=next ? next->read(r.id) : a;
                 if(r.type!="Texture") {
-                    if(MacroMixerMixing::registry().policy(r.type,r.policy).createProcessor) continue;
+                    if(MacroMixerMixing::registry().policy(r.type,mixPolicy(r)).createProcessor) continue;
                     if(outputsBypassed()) {
                         auto value=b;
                         MacroMixerMixing::Registry::validate(r.type,value);
@@ -917,16 +1104,16 @@ void MacroMixerRuntime::draw() {
                         mixedValues[r.id]=std::move(value);
                         continue;
                     }
-                    mixedValues[r.id]=MacroMixerMixing::registry().mix(r.type,r.policy,a,b,next?mixedProgress:1.f,r.options);
+                    mixedValues[r.id]=MacroMixerMixing::registry().mix(r.type,mixPolicy(r),a,b,next?mixedProgress:1.f,mixOptions(r));
                     continue;
                 }
                 // A private identity copy keeps texture outputs alive between
                 // update/draw and bypasses all saved blend/strength options.
-                const auto& policy=MacroMixerMixing::registry().policy(r.type,outputsBypassed() ? "crossfade" : r.policy);
+                const auto& policy=MacroMixerMixing::registry().policy(r.type,outputsBypassed() ? "crossfade" : mixPolicy(r));
                 const auto rendererID=outputsBypassed() ? "morph-copy" : policy.id;
                 auto& renderer=renderers[r.id];
                 const auto evaluate=[&](const MacroMixerMixing::Policy::Function& function) {
-                    auto result=function(a,b,outputsBypassed() ? 1.f : next?mixedProgress:1.f,policy.options(outputsBypassed() ? ofJson::object() : r.options));
+                    auto result=function(a,b,outputsBypassed() ? 1.f : next?mixedProgress:1.f,policy.options(outputsBypassed() ? ofJson::object() : mixOptions(r)));
                     MacroMixerMixing::Registry::validate(r.type,result);
                     return result;
                 };
@@ -948,7 +1135,7 @@ void MacroMixerRuntime::draw() {
     adoptWindows();
 }
 
-void MacroMixerRuntime::clear() {
+void MacroMixerRuntime::releasePlayback() {
     // Restore temporary native routing while the graph owners still exist.
     // Backend retirement leases then outlive both the transition and playback.
     if(next) next->cancelMorph();
@@ -956,19 +1143,27 @@ void MacroMixerRuntime::clear() {
     for(auto& processor:processors) {
         const auto r=std::find_if(interface.routers.begin(),interface.routers.end(),[&](const auto& r){return r.id==processor.first;});
         if(r==interface.routers.end()) continue;
-        try { auto empty=MacroMixerMixing::neutral(r->type); processor.second.function(empty,empty,1.f,MacroMixerMixing::registry().policy(r->type,r->policy).options(r->options)); }
+        try { auto empty=MacroMixerMixing::neutral(r->type); processor.second.function(empty,empty,1.f,MacroMixerMixing::registry().policy(r->type,mixPolicy(*r)).options(mixOptions(*r))); }
         catch(...) {} // Destruction must still release the owned containers.
     }
     processors.clear();
     closeHostedTimelines(); // Before their canvases go.
-    pending.reset(); next.reset(); current.reset(); inPlaceTarget.reset(); errors.clear();
-    cancelBlocked();
+    next.reset(); current.reset(); inPlaceTarget.reset();
     sourceDetailCache.clear(); transitionDetails.clear();
-    finishRequested = false; lastValue = 0; mixedProgress = 0;
+    lastValue = 0; mixedProgress = 0;
     currentMorph = false; nextMorph = false;
     nextMorphReady = true; fadeRunning = false;
     mixedValues.clear();
     renderers.clear();
+}
+void MacroMixerRuntime::clear() {
+    releasePlayback();
+    pending.reset(); errors.clear();
+    cancelBlocked();
+    finishRequested = false;
+    // Back to requests until the next present().
+    sceneMode = false; sceneSettled = false; sceneFlowing = true; sceneOutputsReady = true;
+    sceneProgress = 0; sceneNote.clear(); mixOverrides.clear(); sceneFailed.clear();
 }
 std::string MacroMixerRuntime::status() const {
     std::string label;
@@ -979,9 +1174,11 @@ std::string MacroMixerRuntime::status() const {
         case State::Transitioning: label = "Transitioning"; break;
     }
     if(morphingInPlace()) label = "Morphing live graph";
+    else if(morphing() && sceneMode) label = "Morphing on a second graph; router outputs crossfade";
     else if(morphing()) label = "Crossfading router outputs; graph morph fell back: " + (current && !current->morphFallbackReason.empty()
         ? current->morphFallbackReason : "incompatible structure or configuration");
     if(next && !audioMove.empty()) label += " (" + audioMove + ")";
+    if(sceneMode && !sceneNote.empty()) label += " (" + sceneNote + ")";
     if(pending) label += " (request queued)";
     if(!blocked.empty()) label += " (" + std::to_string(blocked.size()) + " blocked node(s) await a decision)";
     if(!errors.empty()) label += ": " + errors.front().file + ": " + errors.front().message;

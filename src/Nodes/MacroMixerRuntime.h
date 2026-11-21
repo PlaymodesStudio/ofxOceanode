@@ -4,6 +4,20 @@
 
 #include "MacroMixerSource.h"
 
+// What a timeline track wants live at its playhead (MacroMixerRuntime::present).
+struct MacroMixerScene {
+    std::string origin;    // Source ID; empty: nothing plays.
+    std::string target;    // Source ID; empty (or the origin's): the origin alone.
+    float progress = 0;    // 0..1 into the transition, already eased (shape()), any direction.
+    bool morph = false;    // Morph (on a second graph) rather than Mix.
+    float logBlend = 1;    // Log Blend of this morph, 0..1 (see setMorphLogBlend).
+    // This transition's morph policies by type, over morphPoliciesInto(target).
+    MacroMixerMorphPolicies morphPolicies;
+    // This transition's mix policy by Output router ID (policy and options are
+    // read); a router without one, or with an invalid one, uses the contract's.
+    std::map<std::string, MacroMixerContract::Router> routerOverrides;
+};
+
 // Owns ordinary Macro instances and analysed source metadata. Persistence stores folder
 // references only; every activation reads and validates the source again.
 class MacroMixerRuntime {
@@ -110,6 +124,27 @@ public:
     void request(const std::string& folder, float durationMs, float biPow, bool morph = false);
     void requestMacro(const std::string& id, float durationMs, float biPow, bool morph = false);
     void finish() { finishRequested = true; }
+    // Scene mode, for a caller with a playhead: instead of requests, tell every
+    // frame, before update(), what should be live. present() reconciles the
+    // graphs with the scene at once (a source that is not live is loaded
+    // here, on the calling thread) and never throws; failures go to
+    // diagnostics() and sceneStatus(). Graphs the scene still names are kept.
+    // The origin alone after a transition commits it (the scene moved on to
+    // the target) or cancels it (back to the origin); with a target, progress
+    // is applied as given, and 0 and 1 neither cancel nor commit. An empty
+    // scene releases the graphs and leaves the outputs at their defaults.
+    // The first call takes over: a queued request is dropped and a morph in
+    // place rolls back. From then on request() and requestMacro() are refused,
+    // until clear(). Scenes morph on a second graph, never in place, and
+    // saveState() stores no playback.
+    void present(const MacroMixerScene& scene);
+    bool sceneDriven() const { return sceneMode; }
+    // Whether the live graphs are the scene's and its progress is the one
+    // applied. False while a source failed to load or a backend is not ready:
+    // the applied progress then holds its last ready value (0 at first).
+    bool sceneReady() const { return sceneMode && sceneSettled && (!next || sceneFlowing); }
+    // One line for the caller to show: what plays, or why it is not ready.
+    std::string sceneStatus() const;
     void update();
     // Deterministic clock for frame-stepped tests.
     void update(double nowMs);
@@ -150,6 +185,31 @@ public:
 
 private:
     void updateWithClock(const std::function<double()>& clock);
+    // Releases the graphs and their outputs; sources, requests and mode stay.
+    void releasePlayback();
+    // Scene mode. sceneSettled: the graphs are the scene's. sceneFlowing: the
+    // backends of the running transition are ready, so its progress applies.
+    // sceneOutputsReady: the origin has played alone with its backends ready,
+    // which loading a destination waits for (as a request does).
+    bool sceneMode = false, sceneSettled = false, sceneFlowing = true, sceneOutputsReady = true;
+    float sceneProgress = 0, sceneLogBlend = 1;
+    std::string sceneNote; // Why the scene is not ready.
+    MacroMixerMorphPolicies sceneMorphPolicies; // Of the prepared morph.
+    std::map<std::string, MacroMixerMorphPolicy> mixOverrides; // By router ID, validated.
+    // Sources the scene could not load or run, with the reason. Not retried
+    // until the scene stops naming them or they are read again (Refresh).
+    std::map<std::string, std::string> sceneFailed;
+    const std::string& mixPolicy(const MacroMixerContract::Router& router) const {
+        const auto found = mixOverrides.find(router.id); return found == mixOverrides.end() ? router.policy : found->second.policy;
+    }
+    const ofJson& mixOptions(const MacroMixerContract::Router& router) const {
+        const auto found = mixOverrides.find(router.id); return found == mixOverrides.end() ? router.options : found->second.options;
+    }
+    // Reads the source again and loads its graph; null (and sceneFailed) on failure.
+    std::shared_ptr<Graph> buildSceneGraph(const std::string& id);
+    // Prepares the control morph of next from current's values.
+    void prepareSceneMorph(const MacroMixerSource::MorphSnapshot& start, const MacroMixerMorphPolicies& policies, float logBlend);
+    void noteSceneFailure();
     void noteBlocked(const std::string& folder, bool refresh);
     struct Request { std::string folder; Revision revision; float durationMs, biPow; bool morph = false; };
     ofxOceanodeContainer& parent;

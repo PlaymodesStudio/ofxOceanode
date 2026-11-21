@@ -1,8 +1,8 @@
 #pragma once
 #include "ofxOceanodeNodeModel.h"
 #include "MacroMixerRuntime.h"
-#include <array>
-#include <deque>
+#include "MacroMixerGui.h"
+#include "MacroMixerPorts.h"
 
 class ofxOceanodeMacroMixer : public ofxOceanodeNodeModel {
 public:
@@ -42,33 +42,17 @@ public:
     const MacroMixerRuntime* mixerRuntime() const { return runtime.get(); }
     // Asks, one node at a time, whether to keep each blocked node out of the
     // graph. Drawn by the host with the other application-level dialogs.
-    static void drawPendingBlockedNodeDialog();
+    // Covers every owner registered with MacroMixerGui::addBlockedOwner.
+    static void drawPendingBlockedNodeDialog() { MacroMixerGui::drawPendingBlockedNodeDialog(); }
     // Ok, or the worst fallback of the running/next transition, for the Status output.
-    enum class Health { Neutral, Ok, NodeFallback, GraphFallback, Error };
+    using Health = MacroMixerGui::Health;
 private:
-    enum class ActionKind { Import, Refresh, RemoveMacro, MoveMacro, Routers, LoadRouters, SaveRouters, ClearPlayback, MorphPolicy,
-        KeepOut, CancelBlocked, RestoreNode, CheckStatus };
-    struct Action {
-        ActionKind kind;
-        std::string text;
-        size_t index = 0;
-        MacroMixerContract contract;
-        MacroMixerMorphPolicy policy;
-        std::string node;
-    };
-    void installOutputs(const MacroMixerContract& contract);
-    void drawRouters();
+    using ActionKind = MacroMixerGui::ActionKind;
+    // Router ports after a contract change, with their name drafts.
+    void installOutputs(const MacroMixerContract& contract, const MacroMixerContract* previous = nullptr);
     void chooseRouterGroup(bool save);
+    // The shared MACROS panel (MacroMixerGui) with this node's selection and color.
     void drawMacros();
-    void drawDefaultPolicies();
-    // A collapsible bar in the node color with the source's buttons on the right.
-    bool drawSourceHeader(const MacroMixerRevision& macro, size_t index, size_t count, bool fading);
-    void drawSource(const MacroMixerRevision& macro, bool fading);
-    void drawSourceWindows(const MacroMixerRevision& macro);
-    // The source check's morphs into this source, one per origin.
-    void drawSourceChecks(const MacroMixerRevision& macro);
-    // An empty ID edits the mixer default.
-    void drawMorphPolicies(const std::string& id, bool fading);
     void syncSelector();
     void publish();
     bool syncInputs();
@@ -88,15 +72,11 @@ private:
     ofParameter<int> mode; // 0 Mix, 1 Morph.
     ofParameter<int> audioServers; // 0 Single, 1 Alternate (MacroMixerRuntime::setAlternateServers).
     customGuiRegion routerEditor, policyEditor, macroEditor;
-    std::map<std::string, std::shared_ptr<ofxOceanodeAbstractParameter>> outputs;
-    std::map<std::string, std::array<char, 256>> routerDrafts;
-    std::map<std::string, ofEventListener> triggerInputs; // Trigger Input routers, by router ID.
-    std::array<char, 256> newRouterName{};
-    uint64_t routerSequence = 0;
-    int newRouterType = 0, newRouterDirection = 1;
+    // Router ports, name drafts, queued inspector edits and blocked-node answers
+    // (applied on update).
+    MacroMixerPorts ports{*this};
+    MacroMixerGui::State gui;
     std::string selectedID, inspectorError;
-    std::deque<Action> actions;
-    MacroMixerExclusions answeredBlocked; // Answered in the dialog, applied on update.
     bool recallPrepared = false, recallValid = false;
     std::string recalledSelection;
     std::unique_ptr<MacroMixerRuntime> runtime;

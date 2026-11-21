@@ -2099,6 +2099,17 @@ void MacroMixerSource::Graph::cancelMorph() {
     morphTopology.reset(); morphStart.clear(); morphTarget.clear();
 }
 void MacroMixerSource::Graph::applyMorph(float progress) {
+    setMorphProgress(progress);
+    if(progress >= 1) commitMorph();
+}
+void MacroMixerSource::Graph::commitMorph() {
+    clearMorphAutomation(); // At 1 a blend is the timeline's value: no step.
+    if(morphTopology) {
+        morphTopology->commit(); liveMorphDefinition=std::move(morphTopology->targetDefinition);
+    }
+    morphTopology.reset(); morphStart.clear(); morphTarget.clear();
+}
+void MacroMixerSource::Graph::setMorphProgress(float progress) {
     // The destination's timelines read it on their next writes.
     if(morphAutomation) morphAutomation->progress = progress;
     // Resolve each path anew: assigning a control may rebuild ports or a nested
@@ -2136,13 +2147,6 @@ void MacroMixerSource::Graph::applyMorph(float progress) {
         },entry.second.value);
     }
     if(morphTopology) morphTopology->progress(progress);
-    if(progress >= 1) {
-        clearMorphAutomation(); // At 1 a blend is the timeline's value: no step.
-        if(morphTopology) {
-            morphTopology->commit(); liveMorphDefinition=std::move(morphTopology->targetDefinition);
-        }
-        morphTopology.reset(); morphStart.clear(); morphTarget.clear();
-    }
 }
 MacroMixerMorphPolicy MacroMixerSource::connectionPolicy(const std::string& type,const MacroMixerMorphPolicies& policies,bool discrete) {
     return resolveMorphPolicy(type,policies,discrete);

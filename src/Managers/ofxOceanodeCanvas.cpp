@@ -3016,8 +3016,8 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
         std::unordered_set<ofxOceanodeAbstractConnection*> drawnConnections;
         // With colored connections on, a selected node's wires get a black outline.
         // They are drawn after every other wire so nothing covers the outline.
-        constexpr float highlightOutlineExtraWidth = 5.0f; // Total, so 3 px on each side.
-        constexpr ImU32 highlightOutlineColor = IM_COL32(0, 0, 0, 192);
+        constexpr float highlightOutlineExtraWidth = 4.0f; // Total, so 2 px on each side.
+        constexpr ImU32 highlightOutlineColor = IM_COL32(0, 0, 0, 142);
         struct HighlightedConnection {
             glm::vec2 source;
             glm::vec2 sink;

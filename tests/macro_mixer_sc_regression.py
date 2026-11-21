@@ -60,6 +60,9 @@ def production():
     # Newer serverManager versions release folded waveform captures from the graph.
     if 'void serverManager::clearFoldedWaveforms(' in source:
         result+=mixer.block(source,'void serverManager::clearFoldedWaveforms(')+'\n'
+    # They also free the transport gates of Mute When Stopped nodes with it.
+    if 'void serverManager::clearTransportGates(' in source:
+        result+=mixer.block(source,'void serverManager::clearTransportGates(')+'\n'
     result+='void serverManager::setup(){server=setupServer;watchMixerGraphSync();initialized=true;busFromSilent=std::make_unique<ofxSCBus>(RATE_AUDIO,128,server);}\n'
     result+='void serverManager::requireSynthdefFolder(const std::string&){}\nbool serverManager::areRequiredSynthdefsLoading() const {return synthdefsLoading;}\n'
     return result
