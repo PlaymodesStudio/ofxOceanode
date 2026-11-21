@@ -386,6 +386,10 @@ public:
     bool wasValueUserEdited(ofxOceanodeNode& node, const std::string& field,
                             const ofJson& current, bool inspector = false) const;
     void clearUserEditedValues();
+    // Goes up with every value the user changes on a control of this
+    // container's nodes (never back): compared against an earlier reading to
+    // tell whether anything was edited by hand since.
+    std::uint64_t getUserEditSerial() const { return userEditSerial; }
     ofJson getCustomGuisJsonForReview() const;
     ofJson getCustomGuiSnapshotsJsonForReview() const;
     ofJson getMidiBindingsJsonForReview() const;
@@ -489,6 +493,7 @@ private:
     std::unique_ptr<ofxOceanodeCustomGuiExtension> customGuiExtension;
     std::string presetStoragePath;
     std::unordered_map<std::string, ofJson> userEditedValues;
+    std::uint64_t userEditSerial = 0;
     std::string pendingScopeSavePath;
     std::uint64_t pendingScopeSaveDeadlineMillis = 0;
     bool scopeSavePending = false;
@@ -498,6 +503,11 @@ private:
     ofJson unavailableModules, unavailableConnections;
     std::map<std::string, std::string> unavailableNodeFiles;
     std::unordered_set<std::string> unavailableNodeKeys;
+    // Nodes a registry filter kept out of this load (a MacroMixer's kept-out
+    // nodes), with their saved cables and parameters: not created here, and
+    // written back as they were when this container is saved to a folder.
+    ofJson skippedModules, skippedConnections;
+    std::map<std::string, std::string> skippedNodeFiles;
 
     vector<unique_ptr<ofxOceanodeAbstractConnection>> connections;
     std::shared_ptr<ofxOceanodeNodeRegistry>   registry;

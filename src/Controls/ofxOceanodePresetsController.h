@@ -103,6 +103,7 @@ private:
     // Tells the other instances of each global macro written so far to reload.
     void broadcastSavedMacros(PendingSave& request);
     string saveResultText;
+    string externalSaveError; // of "Save sources" in the unsaved-changes dialog
 
     ofJson savedEditState;
     std::function<void()> pendingAction;

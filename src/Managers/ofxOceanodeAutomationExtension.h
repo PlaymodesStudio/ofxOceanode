@@ -3,6 +3,9 @@
 #include "ofMain.h"
 #include <map>
 #include <unordered_set>
+#include <functional>
+#include <string>
+#include <vector>
 
 class ofxOceanodeAbstractParameter;
 class ofxOceanodeNodeModel;
@@ -30,6 +33,18 @@ public:
     // Read-only authored content, excluding clocks and window/view state.
     // Queried at save/load and before discarding work, never every frame.
     virtual ofJson presetEditState() const { return ofJson(); }
+    // Containers the extension runs outside the node graph (the live sources
+    // of a timeline track, each a graph of its own): the time system advances
+    // their free-running clocks (phasors, time generators) with the patch's.
+    // Asked when the set of nodes changes.
+    virtual void forEachClockedGuest(const std::function<void(ofxOceanodeContainer&)>& /*visit*/) {}
+    // Work the extension holds that saving the preset does not write (the
+    // sources of a timeline track, edited in place: they live in folders of
+    // their own). Their names, for the "Save changes?" dialog; asked whenever
+    // unsaved work is looked for, so it must be cheap.
+    virtual std::vector<std::string> unsavedExternalWork() { return {}; }
+    // Writes all of it where it belongs. False, with the reason.
+    virtual bool saveExternalWork(std::string& /*error*/) { return true; }
     virtual bool getPlayOnPresetLoad() const = 0;
     virtual bool isBpmAutomationEnabled() const = 0;
     virtual bool preservesSecondsOnBpmChange() const = 0;

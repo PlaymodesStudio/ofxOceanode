@@ -12,6 +12,7 @@
 #include "ofxOceanodeTimeController.h"
 #include "ofxOceanodeNodeMacro.h"
 #include "ofxOceanodeMacroMixer.h"
+#include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeShared.h"
 #include <algorithm>
 
@@ -206,6 +207,11 @@ bool ofxOceanodeTime::rescanGraphIfChanged(){
         }
     };
     getPhasorsFromContainer(container.get());
+    // Graphs an extension runs beside the node graph (a timeline track's live
+    // sources) are reached by no node: without this their phasors and time
+    // generators never advance.
+    if(auto* automation = container->getAutomationExtension())
+        automation->forEachClockedGuest([&](ofxOceanodeContainer& guest){ getPhasorsFromContainer(&guest); });
     graphScan.generation = generation;
     graphScan.valid = true;
     return true;

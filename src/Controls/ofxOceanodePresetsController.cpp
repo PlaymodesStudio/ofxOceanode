@@ -361,9 +361,31 @@ void ofxOceanodePresetsController::drawPopups(){
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if(ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)){
         const string name = ofxOceanodeShared::getCurrentPresetName();
-        ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
+        auto* automation = container->getAutomationExtension();
+        const auto external = automation != nullptr ? automation->unsavedExternalWork() : std::vector<std::string>();
+        if(!external.empty()){
+            // Not part of the preset: saved to their own folders, here, or lost.
+            ImGui::TextUnformatted("These sources have changes that are not saved to their folders:");
+            for(const auto& item : external) ImGui::BulletText("%s", item.c_str());
+            if(ImGui::Button("Save sources")){
+                externalSaveError.clear();
+                if(!automation->saveExternalWork(externalSaveError) && externalSaveError.empty())
+                    externalSaveError = "The sources could not be saved.";
+                // Nothing else to ask about: the action goes on.
+                if(externalSaveError.empty() && !hasUnsavedChanges()){
+                    actionApproved = true;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            if(ImGui::IsItemHovered()) ImGui::SetTooltip("Write them to their folders now. Saving the preset does not.");
+            if(!externalSaveError.empty()) ImGui::TextColored(ImVec4(1.0f, 0.38f, 0.32f, 1.0f), "%s", externalSaveError.c_str());
+            ImGui::Separator();
+        }
+        if(capturePresetEditState(*container, savedEditState) != savedEditState || !collectGlobalMacroSaveReviews(*container).empty())
+            ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
         if(!name.empty()) ImGui::Text("Preset: %s", name.c_str());
-        ImGui::TextUnformatted("Save your changes before continuing?");
+        ImGui::TextUnformatted(external.empty() ? "Save your changes before continuing?"
+                                                : "Save the preset before continuing? (The sources above are saved with their own button.)");
         if(ImGui::Button("Save changes...")){
             savingBeforeAction = true;
             popupRequest = PopupRequest::SaveAs;
@@ -575,8 +597,12 @@ void ofxOceanodePresetsController::rememberSavedState(){
 }
 
 bool ofxOceanodePresetsController::hasUnsavedChanges(){
+    // (Work an extension keeps outside the preset counts too: saving the
+    // preset does not write it, so it is asked about before it is discarded.)
+    auto* automation = container->getAutomationExtension();
     return capturePresetEditState(*container, savedEditState) != savedEditState ||
-           !collectGlobalMacroSaveReviews(*container).empty();
+           !collectGlobalMacroSaveReviews(*container).empty() ||
+           (automation != nullptr && !automation->unsavedExternalWork().empty());
 }
 
 void ofxOceanodePresetsController::cancelPendingAction(){
@@ -1463,6 +1489,69 @@ ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& bas
 void compareContainer(ofxOceanodeContainer& container, const std::string& savedFolder,
                       const std::string& location, std::vector<GlobalMacroSaveChange>& changes);
 
+// Where a saved string may point as a file: as it is when absolute, else
+// under the data folder, under the folder it was saved in, or in that
+// folder's samples (the forms nodes save an embedded sample path in).
+std::vector<std::filesystem::path> fileCandidates(const std::string& text, const std::string& savedFolder){
+    namespace fs = std::filesystem;
+    std::vector<fs::path> candidates;
+    // (Only what can be a path to a file: cheap to rule out, so nothing else touches the disk.)
+    if(text.empty() || text.size() > 1024 || text.find_first_of("/\\") == std::string::npos ||
+       text.find('\n') != std::string::npos || !fs::path(text).has_extension()) return candidates;
+    const fs::path path(text);
+    // (Absolute, so two spellings of one place compare equal by name.)
+    const auto absolute = [](const fs::path& given){
+        std::error_code error;
+        const auto made = fs::absolute(given, error);
+        return error ? given : made;
+    };
+    if(path.is_absolute()){ candidates.push_back(path); return candidates; }
+    candidates.push_back(absolute(fs::path(ofToDataPath(text, true))));
+    if(!savedFolder.empty()){
+        const fs::path folder = absolute(fs::path(ofToDataPath(savedFolder, true)));
+        candidates.push_back(folder / path);
+        candidates.push_back(folder / "samples" / path.filename());
+    }
+    return candidates;
+}
+
+// The same existing file written two ways (relative in the saved folder,
+// absolute once loaded) is one value, not an edit.
+bool sameSavedFile(const std::string& saved, const std::string& current, const std::string& savedFolder){
+    namespace fs = std::filesystem;
+    if(saved == current) return true;
+    const auto savedCandidates = fileCandidates(saved, savedFolder);
+    if(savedCandidates.empty()) return false;
+    const auto currentCandidates = fileCandidates(current, savedFolder);
+    for(const auto& a : savedCandidates){
+        std::error_code error;
+        const bool exists = fs::is_regular_file(a, error);
+        for(const auto& b : currentCandidates){
+            // The same place by name (a file that is missing is still the
+            // same reference), or the same file on disk (links, case).
+            if(a.lexically_normal() == b.lexically_normal()) return true;
+            if(exists && fs::is_regular_file(b, error) && fs::equivalent(a, b, error) && !error) return true;
+        }
+    }
+    return false;
+}
+
+// The saved value with every string that names the same file as the current
+// one's written as the current one writes it, so only real differences
+// (another file, a missing one) are compared.
+ofJson withCurrentFileSpelling(ofJson saved, const ofJson& current, const std::string& savedFolder, int depth = 0){
+    if(depth > 6) return saved;
+    if(saved.is_string() && current.is_string()){
+        if(sameSavedFile(saved.get<std::string>(), current.get<std::string>(), savedFolder)) return current;
+    }else if(saved.is_object() && current.is_object()){
+        for(auto it = saved.begin(); it != saved.end(); ++it)
+            if(current.contains(it.key())) it.value() = withCurrentFileSpelling(it.value(), current[it.key()], savedFolder, depth + 1);
+    }else if(saved.is_array() && current.is_array() && saved.size() == current.size()){
+        for(size_t i = 0; i < saved.size(); ++i) saved[i] = withCurrentFileSpelling(saved[i], current[i], savedFolder, depth + 1);
+    }
+    return saved;
+}
+
 void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
                  const std::string& savedFolder, const std::string& location,
                  std::vector<GlobalMacroSaveChange>& changes){
@@ -1498,7 +1587,9 @@ void compareNode(ofxOceanodeContainer& owner, ofxOceanodeNode& node,
             // placement, or the current snapshot choice, not macro edits.
             if(it.key() == "AllCurvesOutput" || it.key() == "ExtWindowRect" ||
                it.key() == "ExtWindowMode" || it.key() == "SelectedSnapshotSlot") continue;
-            compareJson(changes, location, label, it.key(), withoutAssistantModel(field(saved, it.key())), it.value());
+            // (A file saved by a relative path and held by its absolute one is the same file.)
+            compareJson(changes, location, label, it.key(),
+                        withCurrentFileSpelling(withoutAssistantModel(field(saved, it.key())), it.value(), savedFolder), it.value());
         }
     }
 

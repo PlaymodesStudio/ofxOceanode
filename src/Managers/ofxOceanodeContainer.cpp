@@ -250,6 +250,8 @@ void ofxOceanodeContainer::clearContainer(){
     unavailableCustomGuiFiles.clear();
     unavailableModules = unavailableConnections = ofJson();
     unavailableNodeFiles.clear(); unavailableNodeKeys.clear();
+    skippedModules = skippedConnections = ofJson();
+    skippedNodeFiles.clear();
 
     std::vector<shared_ptr<ofxOceanodeNode>> toDelete;
     for(auto* nodes : {&dynamicNodes, &persistentNodes}){
@@ -984,6 +986,7 @@ void ofxOceanodeContainer::recordUserEditedValues(ofxOceanodeNode& node,
         auto savedField = saveableValues.find(it.key());
         if(savedField == saveableValues.end()) continue;
         userEditedValues[userEditedValueKey(node, it.key(), inspector)] = *savedField;
+        ++userEditSerial;
     }
 }
 

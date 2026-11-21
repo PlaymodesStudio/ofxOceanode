@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""A file saved by a relative path and held by its absolute one is not an edit.
+
+A node that embeds a sample saves its path relative (to the data folder, or to
+the saved folder's samples) and keeps it absolute once loaded. The Macro
+review compared the two texts and reported a change nobody made, so "Save
+changes?" appeared on an untouched Macro. The review now compares what the
+paths point at: the same file (present or missing) is one value; another
+file is still a difference.
+
+Uses the headless OF fixture; does not launch the host application.
+"""
+import macro_mixer_regression as native
+from new_preset_regression import block
+
+CASES = r'''
+int main(int argc, char** argv) {
+    assert(argc == 3);
+    namespace fs = std::filesystem;
+    fs::current_path(argv[2]); ofDisableDataPath(); ofSeedRandom();
+    const std::string folder = "Macros/Sonif/Macro_2";
+    fs::create_directories(folder + "/samples");
+    std::ofstream(folder + "/samples/a.wav") << "a";
+    std::ofstream(folder + "/samples/b.wav") << "b";
+    const std::string relative = folder + "/samples/a.wav";
+    const std::string absolute = fs::absolute(relative).string();
+    const std::string other = fs::absolute(folder + "/samples/b.wav").string();
+
+    // The same file, written relative to the data folder and absolute.
+    assert(sameSavedFile(relative, absolute, folder));
+    assert(sameSavedFile(absolute, relative, folder));
+    // ...and relative to the saved folder's samples, as an embedded sample is.
+    assert(sameSavedFile("samples/a.wav", absolute, folder));
+    // Another file is a change.
+    assert(!sameSavedFile(relative, other, folder));
+    assert(!sameSavedFile(relative, "", folder));
+    // A file that is missing is still the same reference by either spelling,
+    // and a different one from another missing file.
+    assert(sameSavedFile(folder + "/samples/missing.wav", fs::absolute(folder + "/samples/missing.wav").string(), folder));
+    assert(!sameSavedFile(folder + "/samples/missing.wav", fs::absolute(folder + "/samples/gone.wav").string(), folder));
+    // Text that is no path is compared as text.
+    assert(sameSavedFile("hello", "hello", folder));
+    assert(!sameSavedFile("hello", "world", folder));
+    assert(!sameSavedFile("a/b", "a/c", folder));
+
+    auto changesBetween = [&](const ofJson& saved, const ofJson& current) {
+        std::vector<GlobalMacroSaveChange> changes;
+        compareJson(changes, "Macro", "SC GrainBox 1", "samplePath", withCurrentFileSpelling(saved, current, folder), current);
+        return changes.size();
+    };
+    // The reported case: one field, the same sample.
+    assert(changesBetween(relative, absolute) == 0);
+    assert(changesBetween(relative, other) == 1); // a real change of sample still shows
+    // Paths inside lists and objects (a node with several samples).
+    assert(changesBetween(ofJson::array({relative, ""}), ofJson::array({absolute, ""})) == 0);
+    assert(changesBetween(ofJson::array({relative, ""}), ofJson::array({other, ""})) == 1);
+    assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.5}}) == 0);
+    assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.7}}) == 1);
+    // Values that are not strings are left alone.
+    assert(changesBetween(1, 2) == 1);
+    assert(changesBetween(nullptr, absolute) == 1);
+    std::cout << "PASS: the same file by two spellings is no change, present or missing; another file and other values still are\n";
+}
+'''
+
+
+def main():
+    source = (native.ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
+    helpers = '#include "GlobalMacroSaveReview.h"\n#include <fstream>\n'
+    helpers += "\n".join(block(source, signature) for signature in (
+        "ofJson readJson(", "ofJson field(", "std::string preview(",
+        "std::string fullValue(", "void addChange(", "void compareJson(",
+        "std::vector<std::filesystem::path> fileCandidates(", "bool sameSavedFile(",
+        "ofJson withCurrentFileSpelling(",
+    ))
+    native.CASES = helpers + CASES
+    native.main()
+
+
+if __name__ == "__main__":
+    main()

@@ -516,7 +516,17 @@ The node's inspector panels are in `MacroMixerGui` and its router ports in
 Timeline node's `ROUTERS` ports).
 
 The automation extension has a `draw()` hook, called on the owning container
-before its nodes draw; the Timeline addon draws its engines there.
+before its nodes draw; the Timeline addon draws its engines there. Through
+`forEachClockedGuest()` it hands the time system the canvases of its live
+graphs, so their phasors and time generators advance (no node reaches them). Through
+`unsavedExternalWork()` and `saveExternalWork()` it names, for the presets
+controller's "Save changes?" dialog, the work it keeps outside the preset (the
+track's sources edited in place) and writes it on request.
+
+A container remembers the nodes a registry filter kept out of its load
+(`skippedModules`, `skippedNodeFiles`, `skippedConnections`) and writes them
+back as they were when it is saved, so a source's graph can be saved to its
+folder without losing its kept-out nodes.
 
 ## Triggers (void routers)
 

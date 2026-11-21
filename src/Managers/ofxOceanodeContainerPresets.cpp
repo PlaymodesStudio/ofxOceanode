@@ -45,25 +45,43 @@ namespace {
         return model + "_" + ofToString(ofToInt(identifier));
     }
 
-    void removeSkippedNodes(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& modules){
+    // What is removed is kept apart (skipped, files), as it was saved, so a
+    // save of the loaded container can write it back.
+    void removeSkippedNodes(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& modules,
+                            ofJson& skipped, std::map<std::string, std::string>& files){
         if(!modules.is_object()) return;
         for(auto model = modules.begin(); model != modules.end(); ++model){
             if(!model.value().is_object()) continue;
             for(auto node = model.value().begin(); node != model.value().end();){
-                if(registry.skipsNodeLoad(folder, savedNodeKey(model.key(), node.key()))) node = model.value().erase(node);
+                const auto key = savedNodeKey(model.key(), node.key());
+                if(registry.skipsNodeLoad(folder, key)){
+                    skipped[model.key()][node.key()] = node.value();
+                    const auto filename = key + ".json";
+                    if(ofFile::doesFileExist(folder + "/" + filename)) files[filename] = ofBufferFromFile(folder + "/" + filename).getText();
+                    node = model.value().erase(node);
+                }
                 else ++node;
             }
         }
     }
 
-    void removeSkippedConnections(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& connections){
+    void removeSkippedConnections(const ofxOceanodeNodeRegistry& registry, const std::string& folder, ofJson& connections,
+                                  ofJson& skipped){
         if(!connections.is_object()) return;
         for(auto source = connections.begin(); source != connections.end();){
-            if(registry.skipsNodeLoad(folder, source.key())){ source = connections.erase(source); continue; }
-            if(source.value().is_object()) for(auto& outputs : source.value()){
+            if(registry.skipsNodeLoad(folder, source.key())){
+                skipped[source.key()] = source.value();
+                source = connections.erase(source);
+                continue;
+            }
+            if(source.value().is_object()) for(auto parameter = source.value().begin(); parameter != source.value().end(); ++parameter){
+                auto& outputs = parameter.value();
                 if(!outputs.is_object()) continue;
                 for(auto sink = outputs.begin(); sink != outputs.end();){
-                    if(registry.skipsNodeLoad(folder, sink.key())) sink = outputs.erase(sink);
+                    if(registry.skipsNodeLoad(folder, sink.key())){
+                        skipped[source.key()][parameter.key()][sink.key()] = sink.value();
+                        sink = outputs.erase(sink);
+                    }
                     else ++sink;
                 }
             }
@@ -204,7 +222,9 @@ void ofxOceanodeContainer::loadPreset_loadNodes(string presetFolderPath){
     }
 
     ofJson json = ofLoadJson(modulesPath);
-    removeSkippedNodes(*registry, presetFolderPath, json);
+    skippedModules = ofJson();
+    skippedNodeFiles.clear();
+    removeSkippedNodes(*registry, presetFolderPath, json, skippedModules, skippedNodeFiles);
     unavailableModules = unavailableConnections = ofJson();
     unavailableNodeFiles.clear(); unavailableNodeKeys.clear();
     if(json.is_object()) for(auto model = json.begin(); model != json.end(); ++model) {
@@ -353,7 +373,8 @@ void ofxOceanodeContainer::loadPreset_loadBeforeConnections(string presetFolderP
 
 void ofxOceanodeContainer::loadPreset_loadConnections(string presetFolderPath){
     ofJson json = ofLoadJson(presetFolderPath + "/connections.json");
-    removeSkippedConnections(*registry, presetFolderPath, json);
+    skippedConnections = ofJson();
+    removeSkippedConnections(*registry, presetFolderPath, json, skippedConnections);
     // Cables touching unavailable addon nodes cannot run, but must survive a save.
     // Leave failures between available nodes on the normal diagnostic path.
     unavailableConnections = ofJson();
@@ -611,12 +632,30 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
     }
     if(unavailableModules.is_object()) for(auto model = unavailableModules.begin(); model != unavailableModules.end(); ++model)
         if(!dynamicNodes.count(model.key()) || dynamicNodes.at(model.key()).empty()) json[model.key()] = model.value();
+    // Nodes a registry filter kept out of the load stay in the saved preset:
+    // their entries here, their own files and their cables below. (A live
+    // node that took the same identity since replaces the one kept out.)
+    std::set<std::string> skippedKept;
+    if(skippedModules.is_object()) for(auto model = skippedModules.begin(); model != skippedModules.end(); ++model){
+        if(!model.value().is_object()) continue;
+        for(auto node = model.value().begin(); node != model.value().end(); ++node){
+            if(json.contains(model.key()) && json[model.key()].contains(node.key())) continue;
+            json[model.key()][node.key()] = node.value();
+            skippedKept.insert(savedNodeKey(model.key(), node.key()));
+        }
+    }
     std::set<std::string> registered;
     for(const auto& model : registry->getRegisteredModels()) registered.insert(model.first);
     if(!save.prepare(presetFolderPath, json, registered)) return false;
     for(const auto& document : unavailableNodeFiles)
         oceanodePresetSave::record(ofBufferToFile(presetFolderPath + "/" + document.first,
             ofBuffer(document.second.data(), document.second.size())));
+    for(const auto& document : skippedNodeFiles){
+        const auto key = document.first.substr(0, document.first.size() - std::min<size_t>(5, document.first.size()));
+        if(skippedKept.count(key) == 0) continue;
+        oceanodePresetSave::record(ofBufferToFile(presetFolderPath + "/" + document.first,
+            ofBuffer(document.second.data(), document.second.size())));
+    }
     
     json.clear();
     for(auto &connection : connections){
@@ -633,6 +672,14 @@ bool ofxOceanodeContainer::savePreset(string presetFolderPath){
         for(auto parameter = source.value().begin(); parameter != source.value().end(); ++parameter)
             for(auto sink = parameter.value().begin(); sink != parameter.value().end(); ++sink)
                 json[source.key()][parameter.key()][sink.key()] = sink.value();
+    if(skippedConnections.is_object()) for(auto source = skippedConnections.begin(); source != skippedConnections.end(); ++source){
+        if(!source.value().is_object()) continue;
+        for(auto parameter = source.value().begin(); parameter != source.value().end(); ++parameter){
+            if(!parameter.value().is_object()) continue;
+            for(auto sink = parameter.value().begin(); sink != parameter.value().end(); ++sink)
+                json[source.key()][parameter.key()][sink.key()] = sink.value();
+        }
+    }
     oceanodePresetSave::saveJson(presetFolderPath + "/connections.json", json);
     
     
