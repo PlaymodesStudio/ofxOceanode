@@ -6,6 +6,7 @@
 //
 
 #include "ofxOceanodePresetsController.h"
+#include "ofxOceanodeClipboard.h"
 #include "ofxOceanodeContainer.h"
 #include "ofxOceanodeAutomationExtension.h"
 #include "ofxOceanodeNodeMacro.h"
@@ -553,6 +554,10 @@ void ofxOceanodePresetsController::drawPresetList(){
                         if(ImGui::MenuItem(revealLabel)){
                             const string folder = presetFolderPath(n, bankName);
                             if(!folder.empty()) ofxOceanode::openWithDefaultApp(folder);
+                        }
+                        if(ImGui::MenuItem("Copy Path")){
+                            const string folder = presetFolderPath(n, bankName);
+                            if(!folder.empty()) ofxOceanodeClipboard::setText(folder);
                         }
                         ImGui::EndPopup();
                     }
