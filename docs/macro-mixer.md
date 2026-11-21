@@ -161,6 +161,12 @@ Paths start at the data folder; hover for the full path.
 Previewing does not construct nodes or alter the running graph. Refresh rereads
 edited source files.
 
+A morph in place is refused when the live graph's cables are not the ones it
+was activated with. A cable that is off inside a deactivated Macro is not such
+a change: every cable of a Macro with Active off is off, as saved, and both
+the running graph and the destination may contain deactivated Macros. A cable
+switched off in a canvas that runs is one, and the reason names it.
+
 ### Source check
 
 Every source is checked against every other, so a morph that would fall back

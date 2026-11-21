@@ -598,7 +598,13 @@ MorphEdges liveEdges(ofxOceanodeContainer& container) {
     for(const auto& cable : container.getAllConnections()) {
         auto& from=cable->getSourceParameter(); auto& to=cable->getSinkParameter();
         auto* a=from.getNodeModel(); auto* b=to.getNodeModel();
-        if(!a || !b || !cable->getActive()) throw std::runtime_error("Live Macro cables changed");
+        if(!a || !b) throw std::runtime_error("Live Macro cables changed: a cable has lost one of its nodes");
+        // A cable switched off in a canvas that runs was changed since
+        // activation. In a deactivated Macro every cable is off: that is the
+        // Macro's saved state, not an edit, and no reason to refuse a morph.
+        if(!cable->getActive() && container.isActive())
+            throw std::runtime_error("Live Macro cables changed: "+morphNodeKey(*a)+" / "+from.getName()+" -> "
+                +morphNodeKey(*b)+" / "+to.getName()+" is switched off");
         edges.insert({morphNodeKey(*a),from.getName(),morphNodeKey(*b),to.getName()});
     }
     return edges;
