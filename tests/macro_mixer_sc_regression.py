@@ -141,6 +141,38 @@ int main(int argc,char** argv) {
         r.clear(); output.getParameter<nodePort>("In")=nodePort(); recompute(m1,s1);
     }
     parent.clearContainer(); recompute(m1,s1); assert(TestTone::live==0&&ofxSCSynth::live==0);
+    {
+        // A scene (a timeline's Macro Morphing Track) scrubbed forwards and
+        // then backwards through a transition: both graphs and the bridge's
+        // synth stay, and the gains at a progress are the same whichever way
+        // it was reached.
+        auto& output=parent.createNode(registry->create("SC Output"),1).getNodeModel();
+        MacroMixerRuntime r(parent); auto contract=c; contract.routers[0].policy="fade_out";
+        assert(r.setContract(contract)&&r.importMacro(a)&&r.importMacro(b));
+        MacroMixerScene scene; scene.origin=r.importedMacro(a)->id();
+        double clock=0;
+        auto settle=[&](float progress) {
+            scene.progress=progress;
+            for(int i=0;i<4;++i) { r.present(scene); r.update(clock+=10); output.getParameter<nodePort>("In")=bus(r); recompute(m1,s1); }
+        };
+        settle(0); assert(r.sceneDriven()&&r.sceneReady()&&!r.transitioning()&&r.origin());
+        const auto* originGraph=r.origin();
+        scene.target=r.importedMacro(b)->id();
+        settle(.25f); assert(r.transitioning()&&r.sceneReady()&&r.origin()==originGraph&&r.destination());
+        const auto* destinationGraph=r.destination(); const int nodes=TestTone::live;
+        int id=bridgeID(s1); assert(id>0);
+        const float gainA=s1.synths.at(id).controls.at("gainA"), gainB=s1.synths.at(id).controls.at("gainB");
+        settle(.75f); assert(r.sceneReady()&&bridgeID(s1)==id&&r.origin()==originGraph&&r.destination()==destinationGraph);
+        const float laterB=s1.synths.at(id).controls.at("gainB");
+        assert(laterB>=gainB); // further into the transition, the destination is no quieter
+        settle(.25f); // backwards
+        assert(r.sceneReady()&&r.transitioning()&&bridgeID(s1)==id&&r.origin()==originGraph&&r.destination()==destinationGraph&&TestTone::live==nodes);
+        near(s1.synths.at(id).controls.at("gainA"),gainA); near(s1.synths.at(id).controls.at("gainB"),gainB);
+        scene.target.clear(); settle(0); // left on the left: the origin alone again, on its graph
+        assert(!r.transitioning()&&r.origin()==originGraph&&r.sceneReady());
+        r.clear(); output.getParameter<nodePort>("In")=nodePort(); recompute(m1,s1);
+    }
+    parent.clearContainer(); recompute(m1,s1); assert(TestTone::live==0&&ofxSCSynth::live==0);
     const auto routed=scratch+"/routed",silent=scratch+"/silent";
     fs::copy(b,routed,fs::copy_options::recursive); fs::copy(b,silent,fs::copy_options::recursive);
     auto routedModules=ofLoadJson(routed+"/modules.json"); routedModules["SC Mixer Test Effect"]["02"]={0,0}; ofSaveJson(routed+"/modules.json",routedModules);

@@ -10,6 +10,11 @@ struct MacroMixerScene {
     std::string target;    // Source ID; empty (or the origin's): the origin alone.
     float progress = 0;    // 0..1 into the transition, already eased (shape()), any direction.
     bool morph = false;    // Morph (on a second graph) rather than Mix.
+    // A Morph that reuses the origin's graph when the two sources allow it
+    // (as a request's does), instead of loading the target as a second graph:
+    // tried when the overlap is entered with the target not live; otherwise,
+    // and when the sources do not allow it, the morph runs on two graphs.
+    bool inPlace = false;
     float logBlend = 1;    // Log Blend of this morph, 0..1 (see setMorphLogBlend).
     // This transition's morph policies by type, over morphPoliciesInto(target).
     MacroMixerMorphPolicies morphPolicies;
@@ -180,6 +185,8 @@ public:
     // second graph. Both keep running and their router outputs crossfade with
     // each router's mix policy, while the destination's controls still morph.
     bool morphFallback() const { return next && nextMorph && !inPlaceTarget; }
+    // Scene mode: why the running morph asked to run in place does not (empty: it does, or was not asked to).
+    const std::string& sceneInPlaceNote() const { return inPlaceNote; }
     // Router outputs pass through unmixed while one graph morphs in place.
     bool outputsBypassed() const { return morphMode() && !morphFallback(); }
 
@@ -194,6 +201,7 @@ private:
     bool sceneMode = false, sceneSettled = false, sceneFlowing = true, sceneOutputsReady = true;
     float sceneProgress = 0, sceneLogBlend = 1;
     std::string sceneNote; // Why the scene is not ready.
+    std::string inPlaceNote; // Why the scene's morph is not in place.
     MacroMixerMorphPolicies sceneMorphPolicies; // Of the prepared morph.
     std::map<std::string, MacroMixerMorphPolicy> mixOverrides; // By router ID, validated.
     // Sources the scene could not load or run, with the reason. Not retried

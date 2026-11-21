@@ -485,6 +485,39 @@ plays; edits are not written back to the source folder. Tick a timeline under
 the source's **Windows** to open it in a window of its own whenever the source
 plays (see Source windows).
 
+## Scenes: played by a timeline
+
+Besides requests (the node's Start), the engine can be told every frame what
+should be live: `MacroMixerRuntime::present(MacroMixerScene)`. A scene names an
+origin source, optionally a target, the progress into their transition (any
+direction), Mix or Morph, Log Blend, and that transition's own morph policies
+and router mix overrides. The Timeline addon's Macro Morphing Track drives the
+engine this way from its playhead.
+
+- Presenting the same scene only moves the progress. A scene has no clock:
+  nothing completes by itself.
+- When the scene changes, the engine keeps the graphs it can reuse, commits a
+  destination that became the origin, cancels one the scene left behind, and
+  builds what is missing. An empty scene releases playback.
+- While scene-driven, `request()` is refused; `clear()` returns to requests.
+- Failures never throw: the source is remembered in `sceneFailed` and not
+  loaded again until the scene stops naming it; `sceneReady()` and
+  `sceneStatus()` report.
+- `inPlace` asks a Morph to reuse the origin's graph, as a request's morph
+  does (`prepareMorphInPlace`). It is tried when the target is not live yet;
+  the scene moving on to the target commits it, anything else rolls it back.
+  When the sources do not allow it, or the target is already live, the morph
+  runs on two graphs and `sceneInPlaceNote()` says why.
+- Edits the engine refuses during a transition (routers, imports, policies)
+  are the caller's to sequence: present a one-source scene first.
+
+The node's inspector panels are in `MacroMixerGui` and its router ports in
+`MacroMixerPorts`, shared with the Timeline addon (its routers window and the
+Timeline node's `ROUTERS` ports).
+
+The automation extension has a `draw()` hook, called on the owning container
+before its nodes draw; the Timeline addon draws its engines there.
+
 ## Triggers (void routers)
 
 A router of type **Trigger** selects a void router (`Router v`, port `Val`).

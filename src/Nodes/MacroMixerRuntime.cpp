@@ -579,7 +579,8 @@ bool MacroMixerRuntime::restoreState(const ofJson& saved) {
                 keptOutNodes.insert({folder,key});
             }
         }
-        const auto& playback = saved.at("playback");
+        // (Absent as null: a host that drops null values from what it stores loses the key.)
+        const ofJson playback = saved.contains("playback") ? saved["playback"] : ofJson(nullptr);
         if(!playback.is_null()) {
             const auto id = playback.get<std::string>();
             auto reference = staged.macro(id);
@@ -676,10 +677,10 @@ void MacroMixerRuntime::prepareSceneMorph(const MacroMixerSource::MorphSnapshot&
     }
 }
 void MacroMixerRuntime::present(const MacroMixerScene& scene) {
-    // The scene takes over from requests: a queued one is dropped and a morph
-    // in place (a scene never starts one) rolls back.
+    // The scene takes over from requests: a queued one is dropped. A morph in
+    // place (a request's, or the scene's own) goes on only while the scene
+    // still names its two sources; it ends below otherwise.
     pending.reset(); blockedRequest.reset(); finishRequested=false;
-    if(inPlaceTarget) { if(next) next->cancelMorph(); next.reset(); inPlaceTarget.reset(); }
     sceneMode=true; sceneNote.clear(); sceneSettled=true;
     currentMorph=false; // Mix policies shape a scene's outputs throughout.
     const std::string origin=scene.origin;
@@ -718,6 +719,25 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
             }
             logBlend=std::isfinite(scene.logBlend) ? std::max(0.f,std::min(1.f,scene.logBlend)) : 1.f;
         }
+        // A morph in place ends on its destination (commit) or back on its origin (cancel).
+        const auto endInPlace=[&](bool commit) {
+            if(commit) {
+                next->setMorphProgress(1); next->commitMorph();
+                current->revision=inPlaceTarget; current->source=current->revision->source();
+            } else next->cancelMorph();
+            next.reset(); inPlaceTarget.reset(); nextMorph=false;
+            sourceDetailCache.clear(); sceneOutputsReady=false;
+        };
+        if(inPlaceTarget) {
+            // The same two sources, still to morph in place with the same
+            // settings: only the progress moves (either way).
+            if(currentID()==origin && inPlaceTarget->id()==target && morph && scene.inPlace
+               && logBlend==sceneLogBlend && sameMorphPolicies(policies,sceneMorphPolicies)) return;
+            // The scene moved on to the destination: it stays, on this graph.
+            // Anything else (back to the origin, other sources, Mix, other
+            // settings) puts the origin back first.
+            endInPlace(origin==inPlaceTarget->id());
+        }
         if(current && currentID()==origin && (next ? next->revision->id() : std::string())==target) {
             // The same graphs. Mix/Morph or the morph's policies edited inside
             // the overlap: the destination's controls go back to their own
@@ -727,8 +747,10 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
                 nextMorph=morph;
                 if(morph) { prepareSceneMorph(current->captureMorphValues(),policies,logBlend); if(!next) failure(target); }
             }
+            if(!next || !nextMorph || !scene.inPlace) inPlaceNote.clear();
             return;
         }
+        inPlaceNote.clear();
         const bool hadGraphs=current || next;
         auto a=std::move(current), b=std::move(next);
         const bool hadNext=bool(b), bMorphing=b && nextMorph;
@@ -765,11 +787,44 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
             // As a request waits: the origin plays alone, backends ready, before a destination loads.
             else if(bridged && !sceneOutputsReady) unready("Waiting for the audio backend");
             else {
+                // A morph asked to run in place: on the origin's graph when
+                // the two sources allow it, as a request's does.
+                if(morph && scene.inPlace) {
+                    const auto known=macro(target);
+                    Revision revision;
+                    if(known && importMacro(known->source(),true)) revision=importedMacro(known->source());
+                    if(revision) {
+                        std::vector<MacroMixerMorphDetail> details;
+                        preparing=true;
+                        preparePlacement(*current->placement,current->revision,revision,true);
+                        const bool reuse=current->prepareMorphInPlace(revision,policies,&details,logBlend);
+                        preparing=false;
+                        if(reuse) {
+                            next=current; inPlaceTarget=revision; nextMorph=true;
+                            nextMorphReady=next->morphConnectionsReady(); fadeRunning=false;
+                            durationMs=0; biPow=0; heldProgress=0; mixedProgress=0;
+                            sceneFlowing=!bridged;
+                            sceneMorphPolicies=policies; sceneLogBlend=logBlend;
+                            audioMove.clear(); audioNoted=false;
+                            details.insert(details.begin(),{"context",revision->name(),"From "+current->revision->name()+" to "+revision->name()});
+                            details.push_back({"live","Graph","The origin's graph morphs in place into the destination"});
+                            transitionDetails[revision->id()]=std::move(details); audioDetailsID=revision->id();
+                            return;
+                        }
+                        inPlaceNote=current->morphFallbackReason.empty() ? std::string("incompatible structure or configuration")
+                                                                         : current->morphFallbackReason;
+                    } else inPlaceNote="the destination could not be read";
+                }
                 if(morph) start=current->captureMorphValues();
                 second=buildSceneGraph(target); built=true;
                 if(!second) failure(target);
             }
-        } else if(morph) start=current->captureMorphValues();
+        } else {
+            if(morph) start=current->captureMorphValues();
+            // (Asked in place, but the destination is live already: the
+            // overlap was entered from it.)
+            if(morph && scene.inPlace) inPlaceNote="the destination was already playing";
+        }
         if(!second) return;
         next=std::move(second); nextMorph=morph; nextMorphReady=true; fadeRunning=false;
         durationMs=0; biPow=0; heldProgress=0; mixedProgress=0;
@@ -779,6 +834,8 @@ void MacroMixerRuntime::present(const MacroMixerScene& scene) {
         if(morph) { prepareSceneMorph(start,policies,logBlend); if(!next) failure(target); }
     } catch(const std::exception& e) {
         preparing=false; errors={{"scene",e.what()}};
+        // (A morph in place that failed half way: the graph is let go below or by the next scene.)
+        if(inPlaceTarget) { try { next->cancelMorph(); } catch(...) {} next.reset(); inPlaceTarget.reset(); nextMorph=false; }
         if(!origin.empty()) sceneFailed[origin]=e.what();
         if(!target.empty()) sceneFailed[target]=e.what();
         if(!current && !next) releasePlayback();

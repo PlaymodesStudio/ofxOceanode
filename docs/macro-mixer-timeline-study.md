@@ -1,7 +1,12 @@
 # MacroMixer and nested timelines: feasibility study
 
-Status: study, no code changed. Written against `megabranch26_A` (core) and
-ofxOceanodeTimeline at `3c73eb7` on 2026-10-30.
+Status: superseded. Mixer graphs play their sources' timelines, and the
+Timeline addon's Macro Morphing Track drives the engine from a playhead: see
+`macro-mixer.md` ("Timelines in sources", "Scenes: played by a timeline") and
+the addon's `docs/timeline.md` ("Macro Morphing Track"). Kept for its analysis.
+
+Originally a study with no code changed, written against `megabranch26_A`
+(core) and ofxOceanodeTimeline at `3c73eb7` on 2026-10-30.
 
 Question: with per-macro timelines (a macro owns a `sequence.json`, the parent
 canvas places it through macro tracks), what happens when MacroMixer mixes or
