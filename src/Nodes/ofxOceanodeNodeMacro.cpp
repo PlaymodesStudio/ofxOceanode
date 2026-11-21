@@ -199,6 +199,17 @@ void ofxOceanodeNodeMacro::draw(ofEventArgs &a){
 		const int instances = drawnSharedInstanceCount();
 		if(instances > 1) title += " [" + ofToString(instances) + "x]";
 		canvas.draw(&showWindow, color, title);
+		// Closing the tab with unsaved library edits asks first. The tab stays
+		// open meanwhile, so this instance still owns it and may save.
+		if(!showWindow){
+			showWindow = true;
+			if(!reviewUnsavedChangesBeforeClose()) showWindow = false;
+		}
+		if(showWindow){
+			ImGui::PushID(this);
+			renderMacroUnsavedChangesDialog();
+			ImGui::PopID();
+		}
 	}
 	if(active){
 		container->draw();
@@ -417,32 +428,7 @@ void ofxOceanodeNodeMacro::setup(string additionalInfo){
 		// drop its undo history and the skipped edits of Macros nested in it.
 		if(this == definitionSaver) return;
 		if(!usesLibraryMacro(s) || isLoadingPreset || !presetManager.getNextPresetPath().empty()) return;
-		const string path = presetManager.getCurrentMacroPath();
-		// Load router sort order from macro folder before reloading
-		{
-			string sortOrderFile = path + "/router_sort_order.json";
-			ofJson sortJson;
-			if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
-			loadRouterSortFromJson(sortJson);
-		}
-		// The saved definition carries the saving instance's router values;
-		// keep this instance's exposed values across the reload.
-		const auto instanceValues = captureInputRouterValues();
-		{
-			// Load like every other Macro load: new routers read their saved
-			// name before allNodesCreated() places them in the saved order,
-			// instead of being published under the type label and appended.
-			isLoadingPreset = true;
-			presetManager.setInnerPresetLoadingPath(path);
-			struct LoadingGuard {
-				bool& loading; MacroPresetManager& manager;
-				~LoadingGuard() { loading = false; manager.setInnerPresetLoadingPath(""); }
-			} guard{isLoadingPreset, presetManager};
-			container->loadPreset(path);
-		}
-		restoreInputRouterValues(instanceValues);
-
-		loadGlobalDescription(path);
+		reloadGlobalDefinition();
 	});
 	
 	// Router sort order inspector region
@@ -1106,10 +1092,17 @@ ofxOceanodeNodeMacro::WindowTarget ofxOceanodeNodeMacro::windowTargetFor(ofxOcea
 }
 
 void ofxOceanodeNodeMacro::activateWindow(bool focus){
-	auto& window = windowInstance();
+	// The open tab keeps its instance; with none open, Show opens this one.
+	auto* owner = sharedWindowOwner();
+	auto& window = owner != nullptr ? *owner : *this;
 	window.showWindow = true;
 	window.canvas.forceDockWindow();
 	if(focus) window.canvas.requestFocus();
+}
+
+void ofxOceanodeNodeMacro::requestCloseSharedWindow(){
+	auto* owner = sharedWindowOwner();
+	if(owner == nullptr || !owner->reviewUnsavedChangesBeforeClose()) hideSharedWindow();
 }
 
 void ofxOceanodeNodeMacro::hideSharedWindow(){
@@ -1254,6 +1247,42 @@ void ofxOceanodeNodeMacro::applyLoadCarryOver(const string& path){
 		if(sink.hasInConnection() && !sink.allowsMultipleInputs()) continue;
 		parentContainer->createConnectionFromInfo(cable.sourceNode, cable.sourceParameter, cable.sinkNode, cable.sinkParameter);
 	}
+}
+
+void ofxOceanodeNodeMacro::reloadGlobalDefinition(){
+	const string path = presetManager.getCurrentMacroPath();
+	// Load router sort order from macro folder before reloading
+	{
+		string sortOrderFile = path + "/router_sort_order.json";
+		ofJson sortJson;
+		if(ofFile::doesFileExist(sortOrderFile)) sortJson = ofLoadJson(sortOrderFile);
+		loadRouterSortFromJson(sortJson);
+	}
+	// The saved definition carries the saving instance's router values;
+	// keep this instance's exposed values across the reload.
+	const auto instanceValues = captureInputRouterValues();
+	{
+		// Load like every other Macro load: new routers read their saved
+		// name before allNodesCreated() places them in the saved order,
+		// instead of being published under the type label and appended.
+		isLoadingPreset = true;
+		presetManager.setInnerPresetLoadingPath(path);
+		struct LoadingGuard {
+			bool& loading; MacroPresetManager& manager;
+			~LoadingGuard() { loading = false; manager.setInnerPresetLoadingPath(""); }
+		} guard{isLoadingPreset, presetManager};
+		container->loadPreset(path);
+	}
+	restoreInputRouterValues(instanceValues);
+
+	loadGlobalDescription(path);
+}
+
+void ofxOceanodeNodeMacro::discardGlobalEdits(){
+	if(presetManager.isLocal() || presetManager.getCurrentMacroPath().empty()) return;
+	reloadGlobalDefinition();
+	clearSavedUserEdits(*container);
+	routerOrderUserEdited = false;
 }
 
 void ofxOceanodeNodeMacro::requestMacroSave(){

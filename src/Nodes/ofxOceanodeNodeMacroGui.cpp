@@ -129,14 +129,14 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	const float width = (ofxOceanodeShared::getNodeWidthText() + ofxOceanodeShared::getNodeWidthWidget()) * zoom;
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.f * zoom, ImGui::GetStyle().ItemSpacing.y));
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.f * zoom, ImGui::GetStyle().FramePadding.y));
-	// One tab per global Macro: it always opens the first instance, and only
-	// the instance whose tab is open can close it.
+	// One tab per global Macro: Show opens this instance when no tab is open,
+	// and only the instance whose tab is open can close it.
 	bool show = isSharedWindowVisible();
 	const bool shownByOtherInstance = isWindowShownByOtherInstance();
 	ImGui::BeginDisabled(shownByOtherInstance);
 	if(ImGui::Checkbox("Show?", &show)){
 		if(show) activateWindow();
-		else hideSharedWindow();
+		else requestCloseSharedWindow();
 	}
 	ImGui::EndDisabled();
 	if(shownByOtherInstance && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
@@ -159,7 +159,7 @@ void ofxOceanodeNodeMacro::renderPresetControlGui() {
 	const bool saveLocked = !canSaveDefinition();
 	const char* saveLockedReason = shownByOtherInstance
 		? "Another instance of this Macro is open in a tab. Save it from there."
-		: "Only the first instance of this Macro can be saved. Click Show to open it.";
+		: "Only the instance open in the tab can be saved. Click Show to open this one.";
 	ImGui::SameLine();
 	ImGui::BeginDisabled(saveLocked);
 	if(ImGui::Button("Save", ImVec2(saveText + padding, 0))){
@@ -387,6 +387,7 @@ bool ofxOceanodeNodeMacro::reviewUnsavedChanges(bool forLoad, const string& load
 		if(review.changes.empty()) return false;
 		guiState.unsavedReview = std::move(review);
 		guiState.unsavedForLoad = forLoad;
+		guiState.unsavedForClose = false;
 		guiState.unsavedLoadPath = loadPath;
 		guiState.unsavedLoadName = loadName;
 		guiState.unsavedLoadIsPreset = loadIsPreset;
@@ -394,6 +395,12 @@ bool ofxOceanodeNodeMacro::reviewUnsavedChanges(bool forLoad, const string& load
 		return true;
 	}
 	return false;
+}
+
+bool ofxOceanodeNodeMacro::reviewUnsavedChangesBeforeClose() {
+	if(!reviewUnsavedChanges(false)) return false;
+	guiState.unsavedForClose = true;
+	return true;
 }
 
 void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
@@ -409,7 +416,10 @@ void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
 	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 	if(!ImGui::BeginPopupModal("Unsaved Macro Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) return;
 	const auto& review = guiState.unsavedReview;
-	if(guiState.unsavedForLoad){
+	if(guiState.unsavedForClose){
+		ImGui::TextWrapped("Macro \"%s\" has changes that are not saved to the library. Save them before closing its tab? "
+			"Closing without saving discards them, so another instance can be opened.", review.name.c_str());
+	}else if(guiState.unsavedForLoad){
 		ImGui::TextWrapped("Macro \"%s\" has changes that are not saved to the library. Loading \"%s\" replaces them.",
 			review.name.c_str(), guiState.unsavedLoadName.c_str());
 	}else{
@@ -420,7 +430,23 @@ void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() {
 	ImGui::Separator();
 	drawGlobalMacroSaveChanges(review, width);
 	ImGui::Separator();
-	if(guiState.unsavedForLoad){
+	if(guiState.unsavedForClose){
+		if(ImGui::Button("Save and Close")){
+			pendingGuiAction = [this](){
+				if(saveGlobalDefinition()) hideSharedWindow();
+				else guiState.saveError = "Could not save Macro contents, so its tab stays open.";
+			};
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if(ImGui::Button("Close Without Saving")){
+			pendingGuiAction = [this](){
+				discardGlobalEdits();
+				hideSharedWindow();
+			};
+			ImGui::CloseCurrentPopup();
+		}
+	}else if(guiState.unsavedForLoad){
 		const string path = guiState.unsavedLoadPath;
 		const bool isPreset = guiState.unsavedLoadIsPreset;
 		if(ImGui::Button("Save and Load")){

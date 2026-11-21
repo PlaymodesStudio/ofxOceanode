@@ -422,6 +422,8 @@ def main():
         access.write_text((native.ROOT / "src/Nodes/ofxOceanodeNodeMacro.h").read_text().replace("private:", "public:"))
         native.PRELUDE = '#include "' + str(access) + '"\n' + native.PRELUDE
         native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeNodeMacro::renderPresetControlGui() { assert(false); }', '')
+        native.SUPPORT = native.SUPPORT.replace('void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog() { assert(false); }', '')
+        native.SUPPORT = native.SUPPORT.replace('bool ofxOceanodeNodeMacro::reviewUnsavedChangesBeforeClose() { return false; }', '')
         native.SUPPORT = native.SUPPORT.replace('bool ofxOceanodeNodeMacro::drawNodeParameter(ofxOceanodeAbstractParameter&, float, float) { assert(false); return false; }', '')
         gui = (native.ROOT / "src/Nodes/ofxOceanodeNodeMacroGui.cpp").read_text()
         native.SUPPORT += '\n#include "ofxOceanodeColors.h"\n#include "MacroDialogAppearance.h"\n'
@@ -432,6 +434,7 @@ def main():
                           'void ofxOceanodeNodeMacro::openMacroDeleteDialog(',
                           'void ofxOceanodeNodeMacro::renderMacroDeleteDialog()',
                           'bool ofxOceanodeNodeMacro::reviewUnsavedChanges(',
+                          'bool ofxOceanodeNodeMacro::reviewUnsavedChangesBeforeClose()',
                           'void ofxOceanodeNodeMacro::renderMacroUnsavedChangesDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveDialog()',
                           'void ofxOceanodeNodeMacro::renderMacroSaveLibraryTree()',
