@@ -2557,6 +2557,21 @@ void ofxOceanodeCanvas::draw(bool *open, ofColor color, string title){
                 }
                 if(auto* macro = dynamic_cast<ofxOceanodeNodeMacro*>(&customGuiContextNode->getNodeModel())){
                     ImGui::Separator();
+                    // The macro's own custom GUI panels (when the optional addon is attached)
+                    if(auto inner = macro->getContainer()){
+                        if(auto* gui = inner->getCustomGuiExtension()){
+                            const auto panels = gui->panelWindows();
+                            for(const auto& panel : panels){
+                                const std::string label = panels.size() == 1 ? std::string("Show Custom GUI")
+                                                                             : "Show Custom GUI: " + panel.name;
+                                if(ImGui::MenuItem(label.c_str(), nullptr, panel.open)){
+                                    gui->setPanelOpen(panel.id, !panel.open);
+                                    ImGui::CloseCurrentPopup();
+                                }
+                            }
+                            if(!panels.empty()) ImGui::Separator();
+                        }
+                    }
                     if(ImGui::Selectable("Extract Macro", false, macro->isActive() ? ImGuiSelectableFlags_None : ImGuiSelectableFlags_Disabled)){
                         macroExtractionKey = customGuiContextNode->getParameters().getEscapedName();
                         ImGui::CloseCurrentPopup();
