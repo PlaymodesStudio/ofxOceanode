@@ -235,13 +235,6 @@ public:
     std::string getTimelineParameterPath(ofxOceanodeAbstractParameter& parameter, const ofxOceanodeContainer& base) const;
     // Resolves a path relative to this container (the root: absolute paths).
     ofxOceanodeAbstractParameter* findTimelineParameter(const std::string& parameterPath) const;
-    // The same, and `alive`: expires once the parameter is destroyed (a node
-    // can drop one of its parameters at any time), so a caller may keep the
-    // pointer across frames. Left empty when that cannot be told.
-    ofxOceanodeAbstractParameter* findTimelineParameter(const std::string& parameterPath, std::weak_ptr<void>& alive) const;
-    // Moves whenever a canvas id changes: a timeline path naming it may
-    // resolve elsewhere now (nodes made or deleted move ofxOceanodeNode::graphGeneration).
-    static std::uint64_t canvasIdGeneration(){return canvasIdGenerationCounter();}
     // After `node` moved here: its parameters' old timeline paths (prefix
     // oldNodePath) -> new ones, and for a macro everything inside it, whose
     // canvas id was oldMacroCanvas. Handed to the automation extension.
@@ -403,7 +396,7 @@ public:
 	vector<int> getSelectedCommentIndices();
 	void deselectAllComments();
     
-    void setCanvasID(string s){if(s != canvasID) ++canvasIdGenerationCounter(); canvasID = s;};
+    void setCanvasID(string s){canvasID = s;};
     string getCanvasID() const {return canvasID;};
     void setCanvasDisplayPathProvider(std::function<std::string()> provider){canvasDisplayPathProvider = std::move(provider);}
     std::string getCanvasDisplayPath() const {
@@ -552,7 +545,6 @@ private:
     void midiBindingBound(const void * sender, string &portName);
 #endif
     string canvasID;
-    static std::uint64_t& canvasIdGenerationCounter(){static std::uint64_t counter = 0; return counter;}
     std::function<std::string()> canvasDisplayPathProvider;
 	
 	// Encapsulation support structures and methods

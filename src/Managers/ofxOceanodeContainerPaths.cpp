@@ -148,18 +148,6 @@ ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const 
     return current->findParameter(local);
 }
 
-ofxOceanodeAbstractParameter* ofxOceanodeContainer::findTimelineParameter(const std::string& parameterPath,
-                                                                         std::weak_ptr<void>& alive) const
-{
-    alive.reset();
-    auto* parameter = findTimelineParameter(parameterPath);
-    // Its node's group owns it: the entry holding it says when it is gone.
-    if(auto* model = parameter == nullptr ? nullptr : parameter->getNodeModel())
-        for(const auto& entry : model->getParameterGroup())
-            if(entry.get() == static_cast<ofAbstractParameter*>(parameter)) { alive = entry; break; }
-    return parameter;
-}
-
 ofxOceanodeAbstractParameter* ofxOceanodeContainer::findParameter(const std::string& parameterPath) const
 {
     auto resolved = const_cast<ofxOceanodeContainer*>(this)->resolveParameterFromPath(parameterPath, "");
