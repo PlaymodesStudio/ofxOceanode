@@ -100,10 +100,8 @@ void ofxOceanodeMidiClock::update() {
             open(name);
         } else {
             // The device went away while open: close it (keeping the wish to
-            // reopen) so it is picked up again when it comes back. The open
-            // port's own client lists the ports: availablePorts() creates a
-            // CoreMIDI client per scan, once a second while healthy.
-            const auto ports = midiIn.getInPortList();
+            // reopen) so it is picked up again when it comes back.
+            const auto ports = availablePorts();
             if(std::find(ports.begin(), ports.end(), portName) == ports.end()) {
                 midiIn.removeListener(this);
                 midiIn.closePort();
