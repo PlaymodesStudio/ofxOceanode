@@ -181,20 +181,22 @@ void MacroMixerPorts::write(const Port& port, const MacroMixerMixing::Value& val
     },value);
 }
 
-void MacroMixerPorts::publish(MacroMixerRuntime& runtime) {
+void MacroMixerPorts::publish(MacroMixerRuntime& runtime, bool texturesOnly) {
     const auto& routers = runtime.contract().routers;
     for(const auto& output : installed) {
         const auto port = std::find_if(list.begin(), list.end(), [&](const Port& p) { return p.id == output.first; });
         if(port == list.end() || port->direction != "Output") continue;
+        if(texturesOnly && port->type != "Texture") continue;
         if(std::none_of(routers.begin(), routers.end(), [&](const auto& r) { return r.id == port->id && r.direction == "Output"; })) continue;
         write(*port, runtime.takeOutput(port->id));
     }
 }
 
-void MacroMixerPorts::publish(const Values& outputs) {
+void MacroMixerPorts::publish(const Values& outputs, bool texturesOnly) {
     for(const auto& output : installed) {
         const auto port = std::find_if(list.begin(), list.end(), [&](const Port& p) { return p.id == output.first; });
         if(port == list.end() || port->direction != "Output") continue;
+        if(texturesOnly && port->type != "Texture") continue;
         const auto value = outputs.find(port->id);
         if(value != outputs.end()) write(*port, value->second);
     }

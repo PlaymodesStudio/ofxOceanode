@@ -59,8 +59,12 @@ public:
     // Trigger events are consumed here. From values: an owner feeding several
     // nodes reads once (takeOutputs) and hands the same map to each. Ports
     // without a value of their type are left alone.
-    void publish(MacroMixerRuntime& runtime);
-    void publish(const Values& outputs);
+    // texturesOnly: only the Texture outputs. A host publishes everything on
+    // update and only the textures after draw (where they are rendered):
+    // writing the other outputs again on draw notified everything connected
+    // to them twice per frame (an ILDA Shape sent each line to the laser twice).
+    void publish(MacroMixerRuntime& runtime, bool texturesOnly = false);
+    void publish(const Values& outputs, bool texturesOnly = false);
     // Every Output router of the runtime's contract, read once with takeOutput.
     static Values takeOutputs(MacroMixerRuntime& runtime);
 

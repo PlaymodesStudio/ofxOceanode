@@ -389,7 +389,10 @@ void ofxOceanodeMacroMixer::deactivate() {
 }
 void ofxOceanodeMacroMixer::draw(ofEventArgs&) {
     if(!runtime || !syncInputs()) return;
-    runtime->draw(); publish();
+    // Only the textures, rendered by this draw: the other outputs and the
+    // status went out on update (a draw failure shows in the status on the
+    // next update).
+    runtime->draw(); ports.publish(*runtime, true);
 }
 void ofxOceanodeMacroMixer::presetSave(ofJson& json) {
     if(!runtime) return;

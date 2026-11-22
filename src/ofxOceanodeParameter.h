@@ -11,6 +11,7 @@
 #include "ofParameter.h"
 #include "ofUtils.h"
 #include <cstdint>
+#include <atomic>
 #include "Profiling/ofxOceanodeParameterProfiling.h"
 
 class ofxOceanodeAbstractConnection;
@@ -163,6 +164,16 @@ public:
     }
     // Drops the filter set with ofxOceanodeParameter<T>::setAutomationFilter.
     virtual void clearAutomationFilter(){}
+    // Moves whenever any parameter's automation filter is set or dropped. A
+    // timeline that skips repeating a pass (nothing it would write differs)
+    // looks at it: a filter changes what its writes land as.
+    static uint64_t automationFilterGeneration(){return automationFilterChanges().load(std::memory_order_relaxed);}
+protected:
+    static std::atomic<uint64_t>& automationFilterChanges(){
+        static std::atomic<uint64_t> changes{0};
+        return changes;
+    }
+public:
     // A player that writes only when its own value changes (a Project Track)
     // keeps writing while one is set: what the filter returns moves on.
     virtual bool hasAutomationFilter() const {return false;}
@@ -368,8 +379,14 @@ public:
     // lane) is about to write, before it is compared and set. A MacroMixer
     // morph sets one so a destination timeline blends in from where the
     // control was instead of jumping to its own value.
-    void setAutomationFilter(std::function<ParameterType(const ParameterType&)> filter){automationFilter = std::move(filter);}
-    void clearAutomationFilter() override {automationFilter = nullptr;}
+    void setAutomationFilter(std::function<ParameterType(const ParameterType&)> filter){
+        automationFilter = std::move(filter);
+        automationFilterChanges().fetch_add(1, std::memory_order_relaxed);
+    }
+    void clearAutomationFilter() override {
+        automationFilter = nullptr;
+        automationFilterChanges().fetch_add(1, std::memory_order_relaxed);
+    }
     bool hasAutomationFilter() const override {return static_cast<bool>(automationFilter);}
     ParameterType filterAutomationValue(const ParameterType& value) const {return automationFilter ? automationFilter(value) : value;}
 

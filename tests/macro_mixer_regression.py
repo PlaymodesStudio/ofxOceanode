@@ -544,6 +544,12 @@ int main(int argc,char** argv) {
         m.getParameter<float>("Duration_ms")=0;m.getParameter<void>("Start!").trigger();parent.update();
         auto& out=floating(parent,8);out.getParameter<std::string>("Name")="Outer";
         assert(parent.createConnectionFromInfo("MacroMixer_1","Value","Router_f_8","Value"));near(out.getParameter<float>("Value"),.2);
+        {   // Outputs go out on update; draw publishes only Texture outputs, so
+            // what is connected to a Float output does not run twice a frame.
+            int writes=0; auto counting=m.getParameter<float>("Value").newListener([&](float&){ ++writes; });
+            parent.draw(); assert(writes==0);
+            parent.update(); assert(writes>=1);
+        }
         parent.savePreset(scratch+"/session");parent.clearContainer();assert(parent.loadPreset(scratch+"/session"));parent.update();
         auto& loaded=static_cast<ofxOceanodeMacroMixer&>(parent.getDynamicNodes().at("MacroMixer").at(1)->getNodeModel());
         assert(loaded.mixerRuntime()->origin());near(loaded.getParameter<float>("Value"),.2);assert(parent.getAllConnections().size()==1);
