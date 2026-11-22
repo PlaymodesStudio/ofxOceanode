@@ -62,6 +62,14 @@ struct ofxOceanodeTimelineInstrument {
         bool pitchChangesLength = true;
     };
     std::vector<RowWaveform> rowWaveforms;
+    // Kit only, optional: the named sounds ("variants") each slot can play
+    // (index = slot; may be empty or shorter than voices; an empty list = the
+    // slot has no variants and its Pitch is a transpose as usual). Variant k
+    // of a slot plays when that slot's Pitch is 60 + k (variant 0 = 60), so
+    // a timeline Drum Grid picks a variant per hit and shows its name instead
+    // of a note. Read every frame: names and counts may change. The grid's
+    // per-hit pitch range (+-24) makes variants 0..24 reachable.
+    std::vector<std::vector<std::string>> rowVariants;
     // A chord bank (HarmonyBox): gate component k plays chord k, one chord at
     // a time (the last opened wins), its value the gate level; pitch is null.
     // voices = the chord count, rowNames / rowColors the chords. The timeline
@@ -79,6 +87,7 @@ struct ofxOceanodeTimelineInstrument {
     std::string panelLabel;
 };
 #define OFXOCEANODE_HAS_TIMELINE_ROW_WAVEFORMS 1
+#define OFXOCEANODE_HAS_TIMELINE_ROW_VARIANTS 1
 #define OFXOCEANODE_HAS_TIMELINE_CHORDS 1
 #define OFXOCEANODE_HAS_TIMELINE_CHORD_MENUS 1
 
