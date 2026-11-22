@@ -298,7 +298,9 @@ void ofxOceanodeContainer::update(){
     if(automationExtension != nullptr) automationExtension->beginParameterCache();
     if(automationExtension != nullptr) automationExtension->evaluateAutomation();
     if(automationExtension != nullptr) automationExtension->applyAutomation();
-    // Node updates below may add or delete nodes (a preset load): stop caching.
+    // Node updates below may add or delete nodes (a preset load): the pass
+    // ends. Lookups kept past it are checked against the node graph's
+    // generation and each parameter's lifetime before they are trusted.
     if(automationExtension != nullptr) automationExtension->endParameterCache();
 
     for(auto &nodeTypeMap : dynamicNodes){
