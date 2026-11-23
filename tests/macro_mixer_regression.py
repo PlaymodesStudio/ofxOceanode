@@ -97,6 +97,7 @@ def production():
                 'void ofxOceanodeNodeModel::setNumIdentifier(', 'void ofxOceanodeNodeModel::setContainer(',
                 'void ofxOceanodeNodeModel::deserializeParameter(',
                 'ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState()',
+                'void ofxOceanodeNodeModel::applyTimelineLoop(',
                 'std::shared_ptr<ofxOceanodeTransport> ofxOceanodeNodeModel::getTransport()',
                 'ofxOceanodeTransportState ofxOceanodeNodeModel::missingTimeSourceState(',
                 'void ofxOceanodeNodeModel::addTimeSourceParameter(ofParameter<bool>& syncToggle)',

@@ -521,6 +521,10 @@ private:
     bool declaredSink = false;
     bool nodeSnapshotsDisabled = false;
     static ofxOceanodeTransportState missingTimeSourceState(const ofxOceanodeContainer* container);
+    // Wraps a state of `transport` into the loop of the timeline this node
+    // follows on it (the root transport never loops itself; see
+    // ofxOceanodeTransport::LoopView). Global: as it is.
+    void applyTimelineLoop(const ofxOceanodeTransport& transport, ofxOceanodeTransportState& state) const;
     bool timeSourceEnabled = false;
     ofParameter<std::string> timeSourceIdParameter;
     ofParameter<bool>* timeSourceSync = nullptr;

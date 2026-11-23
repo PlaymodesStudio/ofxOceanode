@@ -69,8 +69,8 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
             if(tip != nullptr && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
         };
         if(model.hasTimeSourceFreeOption()) entry("Free", ofxOceanodeNodeModel::TimeSourceFree, "Not synced: runs on its own.");
-        entry("Global transport", ofxOceanodeNodeModel::TimeSourceGlobal, "The global transport, wherever this node is.");
-        entry("Auto", ofxOceanodeNodeModel::TimeSourceAuto, "The timeline this canvas plays.");
+        entry("Global transport", ofxOceanodeNodeModel::TimeSourceGlobal, "The global transport, wherever this node is, running straight on: timeline loops are ignored.");
+        entry("Auto", ofxOceanodeNodeModel::TimeSourceAuto, "The timeline this canvas plays, through its loop (its first timeline linked to the global transport).");
         entry("Clock", ofxOceanodeNodeModel::TimeSourceClock, "The shared clock: always running, at the root tempo.");
         std::string group = "\x01";
         for(const auto& source : sources){
@@ -82,10 +82,8 @@ void ofxOceanodeInspectorController::drawTimeSource(ofxOceanodeNodeModel& model)
             }
             if(!source.selectable) ImGui::BeginDisabled();
             if(ImGui::Selectable((source.label + "##" + source.id).c_str(), current == source.id)) model.setTimeSourceId(source.id);
-            if(!source.selectable){
-                ImGui::EndDisabled();
-                if(!source.note.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", source.note.c_str());
-            }
+            if(!source.note.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) ImGui::SetTooltip("%s", source.note.c_str());
+            if(!source.selectable) ImGui::EndDisabled();
         }
         ImGui::EndCombo();
     }

@@ -151,11 +151,30 @@ ofxOceanodeTransportState ofxOceanodeNodeModel::missingTimeSourceState(const ofx
     return state;
 }
 
+void ofxOceanodeNodeModel::applyTimelineLoop(const ofxOceanodeTransport& transport, ofxOceanodeTransportState& state) const{
+    // A derived transport (a timeline playing on its own) loops itself.
+    if(transport.isDerived() || hostContainer == nullptr) return;
+    const std::string id = timeSourceEnabled ? timeSourceIdParameter.get() : std::string();
+    if(id == TimeSourceGlobal || id == TimeSourceClock) return;
+    if(!id.empty() && id != TimeSourceAuto && id != TimeSourceFree){
+        // A timeline linked to the global transport, chosen by its id.
+        transport.applyLoopView(id, state);
+        return;
+    }
+    // Auto: the loop of the canvas's default timeline, else the root canvas's.
+    if(transport.applyLoopView(ofxOceanodeTransport::canvasLoopViewId(hostContainer->getCanvasID()), state)) return;
+    transport.applyLoopView(ofxOceanodeTransport::canvasLoopViewId(""), state);
+}
+
 ofxOceanodeTransportState ofxOceanodeNodeModel::getTransportState() const{
     if(hostContainer == nullptr){
         return {};
     }
-    if(auto transport = getTransport()) return transport->getState();
+    if(auto transport = getTransport()){
+        auto state = transport->getState();
+        applyTimelineLoop(*transport, state);
+        return state;
+    }
     return missingTimeSourceState(hostContainer);
 }
 
@@ -163,7 +182,12 @@ ofxOceanodeFrameTransportState ofxOceanodeNodeModel::getFrameTransportState() co
     if(hostContainer == nullptr){
         return {};
     }
-    if(auto transport = getTransport()) return transport->getFrameState();
+    if(auto transport = getTransport()){
+        auto frame = transport->getFrameState();
+        applyTimelineLoop(*transport, frame.previous);
+        applyTimelineLoop(*transport, frame.current);
+        return frame;
+    }
     const auto state = missingTimeSourceState(hostContainer);
     return {state, state};
 }

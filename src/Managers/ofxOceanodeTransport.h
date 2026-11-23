@@ -4,8 +4,11 @@
 #define OFX_OCEANODE_HAS_GLOBAL_TRANSPORT 1
 // Derived transports, timestamped actions and selectable time sources.
 #define OFX_OCEANODE_HAS_DERIVED_TRANSPORTS 1
+// Loop views: a timeline's loop over the (never looping) root transport, as nodes see it.
+#define OFX_OCEANODE_HAS_TRANSPORT_LOOP_VIEWS 1
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -167,6 +170,38 @@ public:
     // Bumped whenever the list of time sources changes.
     uint64_t getTimeSourcesRevision() const;
 
+    // ---- Loop views (kept by the root) ----
+    // The root transport never loops: a timeline playing on it keeps a loop
+    // of its own and wraps the root's position into it. It publishes that
+    // loop here under its time source id, so a node following the root
+    // through that timeline (its canvas's default one, or the one chosen as
+    // its Time Source) sees the same looped position, wraps (loopCount) and
+    // loop range as the timeline's playhead. The core knows nothing about
+    // who publishes them.
+    struct LoopView {
+        bool enabled = false;
+        double startBeat = 0.0, endBeat = 0.0;
+        // The playhead a live loop edit kept: root beat clockBeat was local
+        // beat localBeat in pass `pass`, valid for root generation `generation`.
+        bool anchored = false;
+        double clockBeat = 0.0, localBeat = 0.0;
+        uint64_t pass = 0, generation = 0;
+        // The last root state its owner wrapped: a play/pause since (a new
+        // generation at the expected beat) keeps the anchor.
+        bool hasLastClock = false;
+        ofxOceanodeTransportState lastClock;
+    };
+    void setLoopView(const std::string& id, const LoopView& view);
+    void removeLoopView(const std::string& id);
+    // Wraps `state` (a root state) into the view `id`; false (untouched) when there is none.
+    bool applyLoopView(const std::string& id, ofxOceanodeTransportState& state) const;
+    // The id of the view a canvas's nodes follow by default (its default
+    // timeline's loop); canvasID "" = the root canvas, the fallback for a
+    // canvas that has none.
+    static std::string canvasLoopViewId(const std::string& canvasID) { return "canvas:" + canvasID; }
+    // The wrap itself (pure: the timeline's own playhead goes through it too).
+    static ofxOceanodeTransportState loopedThrough(const LoopView& view, ofxOceanodeTransportState state);
+
 private:
     static uint64_t getSteadyNowUs();
     void advanceStateToNowLocked(uint64_t nowUs);
@@ -228,6 +263,7 @@ private:
     std::vector<TimeSourceEntry> timeSources;
     uint64_t timeSourcesRevision = 0;
     std::shared_ptr<ofxOceanodeTransport> clockTransport;
+    std::map<std::string, LoopView> loopViews; // under childrenMutex
 };
 
 #endif

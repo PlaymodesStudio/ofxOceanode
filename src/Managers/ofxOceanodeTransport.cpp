@@ -580,6 +580,69 @@ uint64_t ofxOceanodeTransport::getTimeSourcesRevision() const {
     return timeSourcesRevision;
 }
 
+// ---- Loop views ----
+
+void ofxOceanodeTransport::setLoopView(const std::string& id, const LoopView& view) {
+    if(root != nullptr) { root->setLoopView(id, view); return; }
+    std::lock_guard<std::mutex> lock(childrenMutex);
+    loopViews[id] = view;
+}
+
+void ofxOceanodeTransport::removeLoopView(const std::string& id) {
+    if(root != nullptr) { root->removeLoopView(id); return; }
+    std::lock_guard<std::mutex> lock(childrenMutex);
+    loopViews.erase(id);
+}
+
+bool ofxOceanodeTransport::applyLoopView(const std::string& id, ofxOceanodeTransportState& state) const {
+    if(root != nullptr) return root->applyLoopView(id, state);
+    LoopView view;
+    {
+        std::lock_guard<std::mutex> lock(childrenMutex);
+        const auto it = loopViews.find(id);
+        if(it == loopViews.end()) return false;
+        view = it->second;
+    }
+    state = loopedThrough(view, state);
+    return true;
+}
+
+ofxOceanodeTransportState ofxOceanodeTransport::loopedThrough(const LoopView& view, ofxOceanodeTransportState state) {
+    bool anchored = view.anchored;
+    if(anchored && state.generation != view.generation) {
+        // A play/pause changes the generation without seeking: the anchor
+        // holds through it. A seek or stop drops it.
+        const auto& last = view.lastClock;
+        const double expected = last.beatPosition + (last.isPlaying
+            ? (state.clockSeconds - last.clockSeconds) * last.bpm / 60.0 : 0.0);
+        anchored = view.hasLastClock && state.isPlaying != last.isPlaying &&
+                   std::abs(state.beatPosition - expected) < 1e-5;
+    }
+    auto secondsAt = [&](double beat) {
+        const double beatsPerSecond = bpmToBeatsPerSecond(state.bpm);
+        return beatsPerSecond > 0.0 ? beat / beatsPerSecond : 0.0;
+    };
+    state.loopEnabled = view.enabled;
+    state.loopStartBeat = view.startBeat;
+    state.loopEndBeat = view.endBeat;
+    state.loopCount = anchored ? view.pass : 0;
+    if(anchored) {
+        state.beatPosition = view.localBeat + state.beatPosition - view.clockBeat;
+        state.seconds = secondsAt(state.beatPosition);
+    }
+    // Moving the end behind the playhead must not pull the playhead back:
+    // it plays on until the next seek or start enters the loop.
+    if(!state.loopActive() || state.beatPosition < view.startBeat ||
+       (anchored && view.localBeat >= view.endBeat)) return state;
+    const double length = view.endBeat - view.startBeat;
+    const double passes = std::floor((state.beatPosition - view.startBeat) / length);
+    state.loopCount += static_cast<uint64_t>(std::max(0.0, passes));
+    state.beatPosition = view.startBeat + (state.beatPosition - view.startBeat - passes * length);
+    if(state.beatPosition >= view.endBeat) state.beatPosition = view.startBeat;
+    state.seconds = secondsAt(state.beatPosition);
+    return state;
+}
+
 // ---- External clock ----
 
 void ofxOceanodeTransport::claimExternalClock(const void* owner) {
