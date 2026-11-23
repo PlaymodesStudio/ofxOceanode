@@ -8,6 +8,10 @@ changes?" appeared on an untouched Macro. The review now compares what the
 paths point at: the same file (present or missing) is one value; another
 file is still a difference.
 
+The same goes for a path inside a data folder shared between machines: saved
+absolute on another machine, it is relative (or under this machine's home
+folder) once loaded here, and is the same place.
+
 Uses the headless OF fixture; does not launch the host application.
 """
 import macro_mixer_regression as native
@@ -56,6 +60,23 @@ int main(int argc, char** argv) {
     assert(changesBetween(ofJson::array({relative, ""}), ofJson::array({other, ""})) == 1);
     assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.5}}) == 0);
     assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.7}}) == 1);
+    // A folder in a data folder shared between machines: saved absolute on
+    // another machine (missing here), it is relative or absolute once loaded.
+    // (The cases above run without a data folder; these need one.)
+    fs::create_directories("data/Supercollider/Samples/Kicks");
+    ofEnableDataPath(); ofSetDataPathRoot(fs::absolute("data"));
+    const std::string elsewhere = "/Users/nobody-here/Shared/data/Supercollider/Samples";
+    const std::string here = ofToDataPath("Supercollider/Samples", true);
+    assert(sameDataFolderPlace(elsewhere, "Supercollider/Samples"));
+    assert(sameDataFolderPlace(elsewhere, here));
+    assert(sameDataFolderPlace(here, "Supercollider/Samples")); // saved here before paths were relative
+    assert(!sameDataFolderPlace(elsewhere, "Supercollider/Samples/Kicks")); // another folder is a change
+    assert(!sameDataFolderPlace(elsewhere, ofToDataPath("Supercollider/Samples/Kicks", true)));
+    assert(!sameDataFolderPlace("/Users/nobody-here/Documents/Samples", "Supercollider/Samples")); // outside any data folder
+    assert(!sameDataFolderPlace("Supercollider", "Samples"));
+    assert(changesBetween(elsewhere, "Supercollider/Samples") == 0);
+    assert(changesBetween(elsewhere, "Supercollider/Samples/Kicks") == 1);
+    ofDisableDataPath();
     // Values that are not strings are left alone.
     assert(changesBetween(1, 2) == 1);
     assert(changesBetween(nullptr, absolute) == 1);
@@ -71,6 +92,7 @@ def main():
         "ofJson readJson(", "ofJson field(", "std::string preview(",
         "std::string fullValue(", "void addChange(", "void compareJson(",
         "std::vector<std::filesystem::path> fileCandidates(", "bool sameSavedFile(",
+        "std::vector<std::string> placesInDataFolder(", "bool sameDataFolderPlace(",
         "ofJson withCurrentFileSpelling(",
     ))
     native.CASES = helpers + CASES

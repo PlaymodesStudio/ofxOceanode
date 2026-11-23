@@ -15,6 +15,7 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanode.h"
+#include <algorithm>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -1536,13 +1537,59 @@ bool sameSavedFile(const std::string& saved, const std::string& current, const s
     return false;
 }
 
+// Where a path is inside the data folder, by each reading of it: a relative
+// path as it is; an absolute one under this machine's data folder; and an
+// absolute one that is missing here but passes through a folder named like
+// the data folder (saved on another machine, whose home folder differs).
+std::vector<std::string> placesInDataFolder(const std::string& text){
+    namespace fs = std::filesystem;
+    std::vector<std::string> places;
+    if(text.empty() || text.size() > 1024 || text.find('\n') != std::string::npos) return places;
+    const auto trimmed = [](fs::path path){
+        path = path.lexically_normal();
+        return path.has_filename() ? path : path.parent_path();
+    };
+    const fs::path path = trimmed(fs::path(text));
+    if(!path.is_absolute()){ places.push_back(path.generic_string()); return places; }
+    const fs::path data = trimmed(fs::path(ofToDataPath("", true)));
+    if(data.filename().empty()) return places; // no data folder to be inside of
+    const fs::path relative = path.lexically_relative(data);
+    if(!relative.empty() && relative != "." && *relative.begin() != ".."){
+        places.push_back(relative.generic_string());
+        return places;
+    }
+    std::error_code error;
+    if(fs::exists(path, error)) return places; // a real place outside the data folder
+    const std::string spelled = path.generic_string();
+    const std::string marker = "/" + data.filename().generic_string() + "/";
+    for(size_t at = spelled.find(marker); at != std::string::npos; at = spelled.find(marker, at + 1))
+        if(at + marker.size() < spelled.size()) places.push_back(spelled.substr(at + marker.size()));
+    return places;
+}
+
+// One place in a data folder shared between machines (a synced project):
+// saved absolute on one machine, it is relative or under another home folder
+// once loaded on this one. Not an edit.
+bool sameDataFolderPlace(const std::string& saved, const std::string& current){
+    namespace fs = std::filesystem;
+    if(saved == current) return true;
+    // (Two relative texts that differ are two values: nothing to look up.)
+    if(!fs::path(saved).is_absolute() && !fs::path(current).is_absolute()) return false;
+    const auto savedPlaces = placesInDataFolder(saved);
+    if(savedPlaces.empty()) return false;
+    for(const auto& place : placesInDataFolder(current))
+        if(std::find(savedPlaces.begin(), savedPlaces.end(), place) != savedPlaces.end()) return true;
+    return false;
+}
+
 // The saved value with every string that names the same file as the current
 // one's written as the current one writes it, so only real differences
 // (another file, a missing one) are compared.
 ofJson withCurrentFileSpelling(ofJson saved, const ofJson& current, const std::string& savedFolder, int depth = 0){
     if(depth > 6) return saved;
     if(saved.is_string() && current.is_string()){
-        if(sameSavedFile(saved.get<std::string>(), current.get<std::string>(), savedFolder)) return current;
+        if(sameSavedFile(saved.get<std::string>(), current.get<std::string>(), savedFolder) ||
+           sameDataFolderPlace(saved.get<std::string>(), current.get<std::string>())) return current;
     }else if(saved.is_object() && current.is_object()){
         for(auto it = saved.begin(); it != saved.end(); ++it)
             if(current.contains(it.key())) it.value() = withCurrentFileSpelling(it.value(), current[it.key()], savedFolder, depth + 1);
