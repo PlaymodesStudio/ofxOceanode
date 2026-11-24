@@ -77,9 +77,20 @@ int main(int argc, char** argv) {
     assert(changesBetween(elsewhere, "Supercollider/Samples") == 0);
     assert(changesBetween(elsewhere, "Supercollider/Samples/Kicks") == 1);
     ofDisableDataPath();
+    // A NaN (a formula dividing by zero) is saved as null and is never equal
+    // to itself: neither is a change, a number in its place is.
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    assert(sameSavedValue(ofJson::array({nan, 1.0}), ofJson::array({nan, 1.0})));
+    assert(sameSavedValue(ofJson::array({nullptr, 1.0}), ofJson::array({nan, 1.0})));
+    assert(!sameSavedValue(ofJson::array({nan, 1.0}), ofJson::array({0.0, 1.0})));
+    assert(sameSavedValue({{"Output", ofJson::array({nan})}}, {{"Output", ofJson::array({nan})}}));
+    assert(!sameSavedValue({{"Output", ofJson::array({nan})}}, {{"Output", ofJson::array({nan, nan})}}));
+    assert(changesBetween(ofJson::array({nullptr, nullptr}), ofJson::array({nan, nan})) == 0);
+    assert(changesBetween(ofJson::array({nullptr, nullptr}), ofJson::array({nan, 2.0})) == 1);
     // Values that are not strings are left alone.
     assert(changesBetween(1, 2) == 1);
     assert(changesBetween(nullptr, absolute) == 1);
+    assert(changesBetween(nullptr, 1.5) == 1);
     std::cout << "PASS: the same file by two spellings is no change, present or missing; another file and other values still are\n";
 }
 '''
@@ -87,9 +98,9 @@ int main(int argc, char** argv) {
 
 def main():
     source = (native.ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
-    helpers = '#include "GlobalMacroSaveReview.h"\n#include <fstream>\n'
+    helpers = '#include "GlobalMacroSaveReview.h"\n#include <fstream>\n#include <limits>\n'
     helpers += "\n".join(block(source, signature) for signature in (
-        "ofJson readJson(", "ofJson field(", "std::string preview(",
+        "bool sameSavedValue(", "ofJson readJson(", "ofJson field(", "std::string preview(",
         "std::string fullValue(", "void addChange(", "void compareJson(",
         "std::vector<std::filesystem::path> fileCandidates(", "bool sameSavedFile(",
         "std::vector<std::string> placesInDataFolder(", "bool sameDataFolderPlace(",

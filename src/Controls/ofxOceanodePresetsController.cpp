@@ -16,6 +16,7 @@
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanode.h"
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -24,6 +25,32 @@
 
 namespace {
 ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& baseline = ofJson());
+
+// Two captured or saved values that are the same. A NaN (a formula dividing
+// by zero) is not equal to itself by ==, and is written to disk as null: here
+// it equals another NaN or a null, so a node that outputs NaN is not an edit
+// that can never be saved away.
+bool sameSavedValue(const ofJson& a, const ofJson& b){
+    if(a == b) return true;
+    const auto notANumber = [](const ofJson& value){
+        return value.is_null() || (value.is_number_float() && std::isnan(value.get<double>()));
+    };
+    if(notANumber(a) && notANumber(b)) return true;
+    if(a.is_array() && b.is_array()){
+        if(a.size() != b.size()) return false;
+        for(size_t i = 0; i < a.size(); ++i) if(!sameSavedValue(a[i], b[i])) return false;
+        return true;
+    }
+    if(a.is_object() && b.is_object()){
+        if(a.size() != b.size()) return false;
+        for(auto it = a.begin(); it != a.end(); ++it){
+            const auto other = b.find(it.key());
+            if(other == b.end() || !sameSavedValue(it.value(), *other)) return false;
+        }
+        return true;
+    }
+    return false;
+}
 
 const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
 const ImVec4 presetItemTextColor(150.0f / 255.0f, 150.0f / 255.0f, 150.0f / 255.0f, 1.0f);
@@ -338,6 +365,9 @@ void ofxOceanodePresetsController::draw(){
 void ofxOceanodePresetsController::drawPopups(){
     // Render dialogs outside the menu using the persistent DockSpace ID stack
     // supplied by ofxOceanodeControls, so they remain open independently.
+    // (Asked once, as the dialog opens: the answer reads every node and every
+    // global macro's files, far too much to ask on each frame it is shown.)
+    if(popupRequest == PopupRequest::UnsavedChanges) presetOrMacrosUnsaved = presetOrMacrosChanged();
     if(popupRequest == PopupRequest::NewBank){
         bankNameBuffer[0] = '\0';
         ImGui::OpenPopup("Add New Bank");
@@ -373,7 +403,8 @@ void ofxOceanodePresetsController::drawPopups(){
                 if(!automation->saveExternalWork(externalSaveError) && externalSaveError.empty())
                     externalSaveError = "The sources could not be saved.";
                 // Nothing else to ask about: the action goes on.
-                if(externalSaveError.empty() && !hasUnsavedChanges()){
+                presetOrMacrosUnsaved = presetOrMacrosChanged();
+                if(externalSaveError.empty() && !presetOrMacrosUnsaved && automation->unsavedExternalWork().empty()){
                     actionApproved = true;
                     ImGui::CloseCurrentPopup();
                 }
@@ -382,7 +413,7 @@ void ofxOceanodePresetsController::drawPopups(){
             if(!externalSaveError.empty()) ImGui::TextColored(ImVec4(1.0f, 0.38f, 0.32f, 1.0f), "%s", externalSaveError.c_str());
             ImGui::Separator();
         }
-        if(capturePresetEditState(*container, savedEditState) != savedEditState || !collectGlobalMacroSaveReviews(*container).empty())
+        if(presetOrMacrosUnsaved)
             ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
         if(!name.empty()) ImGui::Text("Preset: %s", name.c_str());
         ImGui::TextUnformatted(external.empty() ? "Save your changes before continuing?"
@@ -597,12 +628,18 @@ void ofxOceanodePresetsController::rememberSavedState(){
     savedEditState = capturePresetEditState(*container);
 }
 
+// The preset differs from what was loaded or saved, or a global macro in it
+// from its saved definition.
+bool ofxOceanodePresetsController::presetOrMacrosChanged(){
+    return !sameSavedValue(capturePresetEditState(*container, savedEditState), savedEditState) ||
+           !collectGlobalMacroSaveReviews(*container).empty();
+}
+
 bool ofxOceanodePresetsController::hasUnsavedChanges(){
     // (Work an extension keeps outside the preset counts too: saving the
     // preset does not write it, so it is asked about before it is discarded.)
     auto* automation = container->getAutomationExtension();
-    return capturePresetEditState(*container, savedEditState) != savedEditState ||
-           !collectGlobalMacroSaveReviews(*container).empty() ||
+    return presetOrMacrosChanged() ||
            (automation != nullptr && !automation->unsavedExternalWork().empty());
 }
 
@@ -1253,7 +1290,7 @@ std::string fullValue(const ofJson& value){
 void addChange(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
                const std::string& item, const std::string& name,
                const ofJson& saved, const ofJson& current){
-    if(saved == current) return;
+    if(sameSavedValue(saved, current)) return;
     changes.push_back({location, item, name, preview(saved), preview(current),
                        fullValue(saved), fullValue(current)});
 }
@@ -1261,7 +1298,7 @@ void addChange(std::vector<GlobalMacroSaveChange>& changes, const std::string& l
 void compareJson(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
                  const std::string& item, const std::string& name,
                  const ofJson& saved, const ofJson& current, int depth = 0){
-    if(saved == current) return;
+    if(sameSavedValue(saved, current)) return;
     if(depth < 4 && saved.is_object() && current.is_object()){
         std::set<std::string> keys;
         for(auto it = saved.begin(); it != saved.end(); ++it) keys.insert(it.key());
