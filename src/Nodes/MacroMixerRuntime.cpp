@@ -190,14 +190,24 @@ bool MacroMixerRuntime::setContract(const MacroMixerContract& contract) {
         }
     }
     // Removing selected routers only narrows the interface; the source graphs
-    // retain their ordinary internal routers and cables. Other interface changes
-    // still require reimporting the Macros.
+    // retain their ordinary internal routers and cables. Any other change (a
+    // router added, renamed, retyped or turned around) is checked against each
+    // source's files, as a preset load does: it stands when every source still
+    // has the routers, and is refused with the source's own reason otherwise.
     for(const auto& entry : imports) {
         const auto& old = entry.second->contract().routers;
         bool matches = true;
         for(const auto& r : contract.routers) matches = matches && std::any_of(old.begin(), old.end(),
             [&](const auto& candidate) { return r.id == candidate.id && r.name == candidate.name && r.type == candidate.type && r.direction==candidate.direction; });
-        if(!matches) { errors = {{entry.second->name(), "Router edit conflicts with this imported Macro. Remove the Macro before changing its interface."}}; return false; }
+        if(matches) continue;
+        std::vector<MacroMixerDiagnostic> found;
+        if(MacroMixerSource::importFolder(parent, entry.second->source(), resolved, found, entry.second->id(), keptOut.get())) continue;
+        // Blocked nodes are reported once the routers have passed: they are
+        // the source's own pending question, not this edit's.
+        if(!found.empty() && std::all_of(found.begin(), found.end(), [](const auto& e) { return !e.node.empty(); })) continue;
+        errors = {{entry.second->name(), "Router edit does not fit this imported Macro: "
+            + (found.empty() ? std::string("its folder could not be read") : found.front().message)}};
+        return false;
     }
     Inputs inputs;
     for(const auto& r:resolved.routers) if(r.direction=="Input") {

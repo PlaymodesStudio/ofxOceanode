@@ -8,6 +8,10 @@ changes?" appeared on an untouched Macro. The review now compares what the
 paths point at: the same file (present or missing) is one value; another
 file is still a difference.
 
+The same goes for a path inside a data folder shared between machines: saved
+absolute on another machine, it is relative (or under this machine's home
+folder) once loaded here, and is the same place.
+
 Uses the headless OF fixture; does not launch the host application.
 """
 import macro_mixer_regression as native
@@ -56,9 +60,37 @@ int main(int argc, char** argv) {
     assert(changesBetween(ofJson::array({relative, ""}), ofJson::array({other, ""})) == 1);
     assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.5}}) == 0);
     assert(changesBetween({{"main", relative}, {"gain", 0.5}}, {{"main", absolute}, {"gain", 0.7}}) == 1);
+    // A folder in a data folder shared between machines: saved absolute on
+    // another machine (missing here), it is relative or absolute once loaded.
+    // (The cases above run without a data folder; these need one.)
+    fs::create_directories("data/Supercollider/Samples/Kicks");
+    ofEnableDataPath(); ofSetDataPathRoot(fs::absolute("data"));
+    const std::string elsewhere = "/Users/nobody-here/Shared/data/Supercollider/Samples";
+    const std::string here = ofToDataPath("Supercollider/Samples", true);
+    assert(sameDataFolderPlace(elsewhere, "Supercollider/Samples"));
+    assert(sameDataFolderPlace(elsewhere, here));
+    assert(sameDataFolderPlace(here, "Supercollider/Samples")); // saved here before paths were relative
+    assert(!sameDataFolderPlace(elsewhere, "Supercollider/Samples/Kicks")); // another folder is a change
+    assert(!sameDataFolderPlace(elsewhere, ofToDataPath("Supercollider/Samples/Kicks", true)));
+    assert(!sameDataFolderPlace("/Users/nobody-here/Documents/Samples", "Supercollider/Samples")); // outside any data folder
+    assert(!sameDataFolderPlace("Supercollider", "Samples"));
+    assert(changesBetween(elsewhere, "Supercollider/Samples") == 0);
+    assert(changesBetween(elsewhere, "Supercollider/Samples/Kicks") == 1);
+    ofDisableDataPath();
+    // A NaN (a formula dividing by zero) is saved as null and is never equal
+    // to itself: neither is a change, a number in its place is.
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    assert(sameSavedValue(ofJson::array({nan, 1.0}), ofJson::array({nan, 1.0})));
+    assert(sameSavedValue(ofJson::array({nullptr, 1.0}), ofJson::array({nan, 1.0})));
+    assert(!sameSavedValue(ofJson::array({nan, 1.0}), ofJson::array({0.0, 1.0})));
+    assert(sameSavedValue({{"Output", ofJson::array({nan})}}, {{"Output", ofJson::array({nan})}}));
+    assert(!sameSavedValue({{"Output", ofJson::array({nan})}}, {{"Output", ofJson::array({nan, nan})}}));
+    assert(changesBetween(ofJson::array({nullptr, nullptr}), ofJson::array({nan, nan})) == 0);
+    assert(changesBetween(ofJson::array({nullptr, nullptr}), ofJson::array({nan, 2.0})) == 1);
     // Values that are not strings are left alone.
     assert(changesBetween(1, 2) == 1);
     assert(changesBetween(nullptr, absolute) == 1);
+    assert(changesBetween(nullptr, 1.5) == 1);
     std::cout << "PASS: the same file by two spellings is no change, present or missing; another file and other values still are\n";
 }
 '''
@@ -66,11 +98,12 @@ int main(int argc, char** argv) {
 
 def main():
     source = (native.ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
-    helpers = '#include "GlobalMacroSaveReview.h"\n#include <fstream>\n'
+    helpers = '#include "GlobalMacroSaveReview.h"\n#include <fstream>\n#include <limits>\n'
     helpers += "\n".join(block(source, signature) for signature in (
-        "ofJson readJson(", "ofJson field(", "std::string preview(",
+        "bool sameSavedValue(", "ofJson readJson(", "ofJson field(", "std::string preview(",
         "std::string fullValue(", "void addChange(", "void compareJson(",
         "std::vector<std::filesystem::path> fileCandidates(", "bool sameSavedFile(",
+        "std::vector<std::string> placesInDataFolder(", "bool sameDataFolderPlace(",
         "ofJson withCurrentFileSpelling(",
     ))
     native.CASES = helpers + CASES

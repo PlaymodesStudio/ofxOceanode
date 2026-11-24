@@ -72,7 +72,7 @@ def main():
     source = (native.ROOT / "src/Controls/ofxOceanodePresetsController.cpp").read_text()
     helpers = '#include "GlobalMacroSaveReview.h"\n'
     helpers += "\n".join(block(source, signature) for signature in (
-        "ofJson readJson(", "ofJson field(", "std::string preview(",
+        "bool sameSavedValue(", "ofJson readJson(", "ofJson field(", "std::string preview(",
         "std::string fullValue(", "void addChange(", "void compareJson(",
         "ofJson currentComments(", "ofJson normalizedSavedComments(",
     ))

@@ -106,6 +106,10 @@ private:
     string externalSaveError; // of "Save sources" in the unsaved-changes dialog
 
     ofJson savedEditState;
+    // The preset or a global macro in it has changes. Read once when the
+    // unsaved-changes dialog opens (presetOrMacrosUnsaved), not per frame.
+    bool presetOrMacrosChanged();
+    bool presetOrMacrosUnsaved = false;
     std::function<void()> pendingAction;
     bool actionApproved = false;
     bool savingBeforeAction = false;

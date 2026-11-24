@@ -15,6 +15,8 @@
 #include "ofxOceanodeNodeModel.h"
 #include "ofxOceanodeNodeGui.h"
 #include "ofxOceanode.h"
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <map>
 #include <set>
@@ -23,6 +25,32 @@
 
 namespace {
 ofJson capturePresetEditState(ofxOceanodeContainer& container, const ofJson& baseline = ofJson());
+
+// Two captured or saved values that are the same. A NaN (a formula dividing
+// by zero) is not equal to itself by ==, and is written to disk as null: here
+// it equals another NaN or a null, so a node that outputs NaN is not an edit
+// that can never be saved away.
+bool sameSavedValue(const ofJson& a, const ofJson& b){
+    if(a == b) return true;
+    const auto notANumber = [](const ofJson& value){
+        return value.is_null() || (value.is_number_float() && std::isnan(value.get<double>()));
+    };
+    if(notANumber(a) && notANumber(b)) return true;
+    if(a.is_array() && b.is_array()){
+        if(a.size() != b.size()) return false;
+        for(size_t i = 0; i < a.size(); ++i) if(!sameSavedValue(a[i], b[i])) return false;
+        return true;
+    }
+    if(a.is_object() && b.is_object()){
+        if(a.size() != b.size()) return false;
+        for(auto it = a.begin(); it != a.end(); ++it){
+            const auto other = b.find(it.key());
+            if(other == b.end() || !sameSavedValue(it.value(), *other)) return false;
+        }
+        return true;
+    }
+    return false;
+}
 
 const ImVec4 bankTextColor(1.0f, 1.0f, 1.0f, 1.0f);
 const ImVec4 presetItemTextColor(150.0f / 255.0f, 150.0f / 255.0f, 150.0f / 255.0f, 1.0f);
@@ -337,6 +365,9 @@ void ofxOceanodePresetsController::draw(){
 void ofxOceanodePresetsController::drawPopups(){
     // Render dialogs outside the menu using the persistent DockSpace ID stack
     // supplied by ofxOceanodeControls, so they remain open independently.
+    // (Asked once, as the dialog opens: the answer reads every node and every
+    // global macro's files, far too much to ask on each frame it is shown.)
+    if(popupRequest == PopupRequest::UnsavedChanges) presetOrMacrosUnsaved = presetOrMacrosChanged();
     if(popupRequest == PopupRequest::NewBank){
         bankNameBuffer[0] = '\0';
         ImGui::OpenPopup("Add New Bank");
@@ -372,7 +403,8 @@ void ofxOceanodePresetsController::drawPopups(){
                 if(!automation->saveExternalWork(externalSaveError) && externalSaveError.empty())
                     externalSaveError = "The sources could not be saved.";
                 // Nothing else to ask about: the action goes on.
-                if(externalSaveError.empty() && !hasUnsavedChanges()){
+                presetOrMacrosUnsaved = presetOrMacrosChanged();
+                if(externalSaveError.empty() && !presetOrMacrosUnsaved && automation->unsavedExternalWork().empty()){
                     actionApproved = true;
                     ImGui::CloseCurrentPopup();
                 }
@@ -381,7 +413,7 @@ void ofxOceanodePresetsController::drawPopups(){
             if(!externalSaveError.empty()) ImGui::TextColored(ImVec4(1.0f, 0.38f, 0.32f, 1.0f), "%s", externalSaveError.c_str());
             ImGui::Separator();
         }
-        if(capturePresetEditState(*container, savedEditState) != savedEditState || !collectGlobalMacroSaveReviews(*container).empty())
+        if(presetOrMacrosUnsaved)
             ImGui::TextUnformatted("There are unsaved changes to the preset or its macros.");
         if(!name.empty()) ImGui::Text("Preset: %s", name.c_str());
         ImGui::TextUnformatted(external.empty() ? "Save your changes before continuing?"
@@ -596,12 +628,18 @@ void ofxOceanodePresetsController::rememberSavedState(){
     savedEditState = capturePresetEditState(*container);
 }
 
+// The preset differs from what was loaded or saved, or a global macro in it
+// from its saved definition.
+bool ofxOceanodePresetsController::presetOrMacrosChanged(){
+    return !sameSavedValue(capturePresetEditState(*container, savedEditState), savedEditState) ||
+           !collectGlobalMacroSaveReviews(*container).empty();
+}
+
 bool ofxOceanodePresetsController::hasUnsavedChanges(){
     // (Work an extension keeps outside the preset counts too: saving the
     // preset does not write it, so it is asked about before it is discarded.)
     auto* automation = container->getAutomationExtension();
-    return capturePresetEditState(*container, savedEditState) != savedEditState ||
-           !collectGlobalMacroSaveReviews(*container).empty() ||
+    return presetOrMacrosChanged() ||
            (automation != nullptr && !automation->unsavedExternalWork().empty());
 }
 
@@ -1252,7 +1290,7 @@ std::string fullValue(const ofJson& value){
 void addChange(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
                const std::string& item, const std::string& name,
                const ofJson& saved, const ofJson& current){
-    if(saved == current) return;
+    if(sameSavedValue(saved, current)) return;
     changes.push_back({location, item, name, preview(saved), preview(current),
                        fullValue(saved), fullValue(current)});
 }
@@ -1260,7 +1298,7 @@ void addChange(std::vector<GlobalMacroSaveChange>& changes, const std::string& l
 void compareJson(std::vector<GlobalMacroSaveChange>& changes, const std::string& location,
                  const std::string& item, const std::string& name,
                  const ofJson& saved, const ofJson& current, int depth = 0){
-    if(saved == current) return;
+    if(sameSavedValue(saved, current)) return;
     if(depth < 4 && saved.is_object() && current.is_object()){
         std::set<std::string> keys;
         for(auto it = saved.begin(); it != saved.end(); ++it) keys.insert(it.key());
@@ -1536,13 +1574,59 @@ bool sameSavedFile(const std::string& saved, const std::string& current, const s
     return false;
 }
 
+// Where a path is inside the data folder, by each reading of it: a relative
+// path as it is; an absolute one under this machine's data folder; and an
+// absolute one that is missing here but passes through a folder named like
+// the data folder (saved on another machine, whose home folder differs).
+std::vector<std::string> placesInDataFolder(const std::string& text){
+    namespace fs = std::filesystem;
+    std::vector<std::string> places;
+    if(text.empty() || text.size() > 1024 || text.find('\n') != std::string::npos) return places;
+    const auto trimmed = [](fs::path path){
+        path = path.lexically_normal();
+        return path.has_filename() ? path : path.parent_path();
+    };
+    const fs::path path = trimmed(fs::path(text));
+    if(!path.is_absolute()){ places.push_back(path.generic_string()); return places; }
+    const fs::path data = trimmed(fs::path(ofToDataPath("", true)));
+    if(data.filename().empty()) return places; // no data folder to be inside of
+    const fs::path relative = path.lexically_relative(data);
+    if(!relative.empty() && relative != "." && *relative.begin() != ".."){
+        places.push_back(relative.generic_string());
+        return places;
+    }
+    std::error_code error;
+    if(fs::exists(path, error)) return places; // a real place outside the data folder
+    const std::string spelled = path.generic_string();
+    const std::string marker = "/" + data.filename().generic_string() + "/";
+    for(size_t at = spelled.find(marker); at != std::string::npos; at = spelled.find(marker, at + 1))
+        if(at + marker.size() < spelled.size()) places.push_back(spelled.substr(at + marker.size()));
+    return places;
+}
+
+// One place in a data folder shared between machines (a synced project):
+// saved absolute on one machine, it is relative or under another home folder
+// once loaded on this one. Not an edit.
+bool sameDataFolderPlace(const std::string& saved, const std::string& current){
+    namespace fs = std::filesystem;
+    if(saved == current) return true;
+    // (Two relative texts that differ are two values: nothing to look up.)
+    if(!fs::path(saved).is_absolute() && !fs::path(current).is_absolute()) return false;
+    const auto savedPlaces = placesInDataFolder(saved);
+    if(savedPlaces.empty()) return false;
+    for(const auto& place : placesInDataFolder(current))
+        if(std::find(savedPlaces.begin(), savedPlaces.end(), place) != savedPlaces.end()) return true;
+    return false;
+}
+
 // The saved value with every string that names the same file as the current
 // one's written as the current one writes it, so only real differences
 // (another file, a missing one) are compared.
 ofJson withCurrentFileSpelling(ofJson saved, const ofJson& current, const std::string& savedFolder, int depth = 0){
     if(depth > 6) return saved;
     if(saved.is_string() && current.is_string()){
-        if(sameSavedFile(saved.get<std::string>(), current.get<std::string>(), savedFolder)) return current;
+        if(sameSavedFile(saved.get<std::string>(), current.get<std::string>(), savedFolder) ||
+           sameDataFolderPlace(saved.get<std::string>(), current.get<std::string>())) return current;
     }else if(saved.is_object() && current.is_object()){
         for(auto it = saved.begin(); it != saved.end(); ++it)
             if(current.contains(it.key())) it.value() = withCurrentFileSpelling(it.value(), current[it.key()], savedFolder, depth + 1);
