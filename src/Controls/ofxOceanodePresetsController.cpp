@@ -343,7 +343,12 @@ void ofxOceanodePresetsController::draw(){
     if(ImGui::MenuItem("New Bank")){
         popupRequest = PopupRequest::NewBank;
     }
-    if(ImGui::MenuItem("Save Preset", nullptr, false, !presetName.empty())){
+#ifdef TARGET_OSX
+    const char* saveShortcut = "CMD+S";
+#else
+    const char* saveShortcut = "CTRL+S";
+#endif
+    if(ImGui::MenuItem("Save Preset", saveShortcut, false, !presetName.empty())){
         savePreset(presetIndex, bankName);
     }
     if(ImGui::MenuItem("Save Preset As")){
@@ -363,6 +368,29 @@ void ofxOceanodePresetsController::draw(){
 }
 
 void ofxOceanodePresetsController::drawPopups(){
+    // Cmd+S (Ctrl+S elsewhere) saves the loaded preset, or opens Save As when none is loaded.
+    {
+        const auto& io = ImGui::GetIO();
+#ifdef TARGET_OSX
+        // ImGui swaps Cmd/Ctrl when macOS behaviors are enabled. KeyCtrl then
+        // represents physical Command; KeySuper represents physical Control.
+        const bool command = io.ConfigMacOSXBehaviors
+            ? io.KeyCtrl && !io.KeySuper
+            : io.KeySuper && !io.KeyCtrl;
+#else
+        const bool command = io.KeyCtrl && !io.KeySuper;
+#endif
+        if(command && !io.KeyShift && !io.KeyAlt &&
+           popupRequest == PopupRequest::None && !pendingSave && !pendingAction &&
+           !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) &&
+           ImGui::IsKeyPressed(ImGuiKey_S, false)){
+            const bool hasBank = currentBank >= 0 && currentBank < static_cast<int>(banks.size());
+            const string bankName = hasBank ? banks[currentBank] : "";
+            const int presetIndex = hasBank ? currentPreset[bankName] : -1;
+            if(!presetNameAt(presetIndex, bankName).empty()) savePreset(presetIndex, bankName);
+            else popupRequest = PopupRequest::SaveAs;
+        }
+    }
     // Render dialogs outside the menu using the persistent DockSpace ID stack
     // supplied by ofxOceanodeControls, so they remain open independently.
     // (Asked once, as the dialog opens: the answer reads every node and every
